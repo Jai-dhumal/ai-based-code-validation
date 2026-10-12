@@ -8,7 +8,7 @@
       "role": "student",
       "rollNo": "CE2025-01",
       "department": "Computer Engineering",
-      "lastHeartbeat": "2026-10-12T11:34:17.581Z",
+      "lastHeartbeat": "2026-10-12T11:43:50.589Z",
       "isOnline": true,
       "photoUrl": "/api/profile/photo/usr_student_1.jpg",
       "createdAt": "2026-09-01T00:00:00Z",
@@ -35,7 +35,7 @@
       "role": "student",
       "rollNo": "CE2025-03",
       "department": "Computer Engineering",
-      "lastHeartbeat": "2026-10-12T11:39:18.387Z",
+      "lastHeartbeat": "2026-10-12T11:48:51.456Z",
       "isOnline": false,
       "createdAt": "2026-09-01T00:00:00Z",
       "division": "A"
@@ -48,7 +48,7 @@
       "role": "teacher",
       "department": "Computer Engineering",
       "title": "Assistant Professor & Guide",
-      "lastHeartbeat": "2026-10-12T11:39:18.296Z",
+      "lastHeartbeat": "2026-10-12T11:48:51.371Z",
       "isOnline": true,
       "createdAt": "2026-09-01T00:00:00Z",
       "divisions": [
@@ -78,7 +78,7 @@
       "role": "admin",
       "department": "Computer Engineering",
       "title": "Head of Department & Administrator",
-      "lastHeartbeat": "2026-10-12T11:39:18.134Z",
+      "lastHeartbeat": "2026-10-12T11:48:51.180Z",
       "isOnline": true,
       "rollNo": "",
       "photoUrl": "/api/profile/photo/usr_admin_1.jpeg",
@@ -166,6 +166,19 @@
       "lastHeartbeat": "2026-10-12T11:39:44.385Z",
       "isOnline": true,
       "createdAt": "2026-10-12T11:39:44.385Z"
+    },
+    {
+      "id": "usr_1791805731445",
+      "name": "Hacker",
+      "email": "hacker_1791805731373@jspm.edu",
+      "password": "$2b$10$oCoCQZg9TZfq9EQ4uk5fgumyzpjr7zNR8Lz/aewrM/NbKe2a2YjVa",
+      "role": "student",
+      "rollNo": "CE2025-63",
+      "department": "Computer Engineering",
+      "division": "A",
+      "lastHeartbeat": "2026-10-12T11:48:51.445Z",
+      "isOnline": true,
+      "createdAt": "2026-10-12T11:48:51.445Z"
     }
   ],
   "assignments": [
@@ -475,7 +488,7 @@
       "grantedBy": "usr_teacher_1",
       "grantedAt": "2026-10-12T09:55:25.402Z",
       "expiresAt": null,
-      "updatedAt": "2026-10-12T11:39:18.465Z"
+      "updatedAt": "2026-10-12T11:48:51.533Z"
     },
     {
       "id": "perm_1791799062456_1",
@@ -539,6 +552,15 @@
       "enabledBy": "usr_teacher_1",
       "enabledAt": "2026-10-12T11:39:17.801Z",
       "revokedAt": "2026-10-12T11:39:17.802Z"
+    },
+    {
+      "id": "perm_1791805730808_1",
+      "studentId": "usr_student_1",
+      "assignmentId": "asg_test_perm_1791805730808",
+      "status": "revoked",
+      "enabledBy": "usr_teacher_1",
+      "enabledAt": "2026-10-12T11:48:50.808Z",
+      "revokedAt": "2026-10-12T11:48:50.808Z"
     }
   ],
   "vivaSubmissions": [
@@ -733,6 +755,28 @@
       "similarity": 35,
       "jaccardSimilarity": 35,
       "submittedAt": "2026-10-12T11:39:18.497Z"
+    },
+    {
+      "id": "viva_1791805730810",
+      "studentId": "usr_student_3",
+      "assignmentId": "asg_1",
+      "originalSubmissionId": "sub_omkar_bst",
+      "vivaCode": "\nclass BinarySearchTree:\n    def __init__(self):\n        self.root_node = None\n    def insert(self, value):\n        if not self.root_node:\n            self.root_node = TreeNode(value)\n",
+      "jaccardSimilarity": 63,
+      "comparedAt": "2026-10-12T11:48:50.810Z"
+    },
+    {
+      "id": "viva_1791805731565",
+      "studentId": "usr_student_3",
+      "studentName": "Omkar Chede",
+      "rollNo": "CE2025-03",
+      "assignmentId": "asg_1",
+      "code": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n    def insert(self, val):\n        pass\n",
+      "vivaCode": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n    def insert(self, val):\n        pass\n",
+      "language": "python",
+      "similarity": 35,
+      "jaccardSimilarity": 35,
+      "submittedAt": "2026-10-12T11:48:51.565Z"
     }
   ]
 }

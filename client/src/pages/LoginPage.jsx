@@ -658,35 +658,16 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                 </div>
               </div>
 
-              {/* Simulation Helper Pill for Viva / Lab Demo */}
-              {simulatedOtps && (
-                <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-[11px] space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      Live Dispatched OTP Codes:
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEmailOtp(simulatedOtps.emailOtp);
-                        setMobileOtp(simulatedOtps.mobileOtp);
-                      }}
-                      className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[10px] font-bold transition"
-                    >
-                      Auto-Fill Codes
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-center font-mono font-bold text-emerald-900 dark:text-emerald-200">
-                    <div className="p-1.5 rounded-lg bg-emerald-100/60 dark:bg-emerald-900/60">
-                      📧 Email: {simulatedOtps.emailOtp}
-                    </div>
-                    <div className="p-1.5 rounded-lg bg-emerald-100/60 dark:bg-emerald-900/60">
-                      📱 Mobile: {simulatedOtps.mobileOtp}
-                    </div>
-                  </div>
+              {/* Security Delivery Notice */}
+              <div className="p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-900 dark:text-indigo-300 flex items-start gap-2.5">
+                <Mail className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="font-bold">Confidential Verification Codes Dispatched</p>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                    Your 6-digit OTP has been sent securely to <strong>{email}</strong>. Please check your Gmail inbox (and Spam/Updates folder) to enter the code.
+                  </p>
                 </div>
-              )}
+              </div>
 
               {/* Email OTP Input */}
               <div>

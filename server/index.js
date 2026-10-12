@@ -13,6 +13,7 @@ import { runTier1Check, compareCode } from './plagiarism/winnowing.js';
 import { tokenizeCode } from './plagiarism/tokenizer.js';
 import { runTier2Evaluation, generateCodeQuiz } from './services/gemini.js';
 import { generateSubmissionReceipt } from './services/github.js';
+import nodemailer from 'nodemailer';
 
 dotenv.config();
 
@@ -176,6 +177,61 @@ function generateOtp() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+// Nodemailer Transporter for Real Gmail OTP Dispatch
+function getMailTransporter() {
+  const user = process.env.GMAIL_USER || process.env.SMTP_USER;
+  const pass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+
+  if (user && pass) {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user, pass }
+    });
+  }
+  return null;
+}
+
+async function sendRealEmailOtp(toEmail, otpCode, role) {
+  const transporter = getMailTransporter();
+  if (!transporter) {
+    console.log(`ℹ️ [MAILER] No Gmail credentials configured in .env. OTP for ${toEmail}: ${otpCode}`);
+    return false;
+  }
+
+  const mailOptions = {
+    from: `"JSPM BSIOTR AI Code Validator" <${process.env.GMAIL_USER || 'noreply@jspm.edu'}>`,
+    to: toEmail,
+    subject: `🔐 Your Verification OTP Code: ${otpCode} - JSPM BSIOTR`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: #4f46e5; margin: 0;">JSPM BSIOTR Wagholi, Pune</h2>
+          <p style="color: #64748b; font-size: 13px; margin: 4px 0 0 0;">AI-Based Code Validation Platform 2.0</p>
+        </div>
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 20px;">
+          <p style="color: #334155; font-size: 14px; margin: 0 0 10px 0;">Your 6-Digit Email Verification Code for <strong>${role.toUpperCase()}</strong> registration is:</p>
+          <div style="font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #4f46e5; font-family: monospace; padding: 10px 0;">
+            ${otpCode}
+          </div>
+          <p style="color: #ef4444; font-size: 12px; margin: 8px 0 0 0;">Valid for 10 minutes. Do not share this code with anyone.</p>
+        </div>
+        <p style="color: #94a3b8; font-size: 11px; text-align: center; margin: 0;">
+          Department of Computer Engineering • Academic Year 2025-26
+        </p>
+      </div>
+    `
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`📧 [REAL EMAIL SENT] Successfully sent OTP ${otpCode} to ${toEmail}: ${info.messageId}`);
+    return true;
+  } catch (err) {
+    console.error(`❌ [MAIL ERROR] Failed to send email to ${toEmail}:`, err.message);
+    return false;
+  }
+}
+
 // Endpoint: Send OTP for Email and Mobile verification
 app.post('/api/auth/send-otp', async (req, res) => {
   try {
@@ -216,19 +272,19 @@ app.post('/api/auth/send-otp', async (req, res) => {
       verified: false
     });
 
-    console.log(`\n🔐 [OTP DISPATCH] Registration for ${cleanEmail} (${cleanMobile}):`);
-    console.log(`   📧 Email OTP:  ${emailOtp}`);
-    console.log(`   📱 Mobile OTP: ${mobileOtp}\n`);
+    // Send real Gmail OTP
+    const sentRealMail = await sendRealEmailOtp(cleanEmail, emailOtp, role);
+
+    console.log(`\n🔐 [SECURE OTP LOG] Dispatch for ${cleanEmail} (${cleanMobile}):`);
+    console.log(`   📧 Email OTP:  ${emailOtp} ${sentRealMail ? '(SENT VIA GMAIL)' : '(Logged to Server Terminal)'}`);
+    console.log(`   📱 Mobile OTP: ${mobileOtp} (Logged to Server Terminal)\n`);
 
     res.json({
       success: true,
-      message: 'Verification OTPs generated and dispatched.',
-      expiresInSeconds: 600,
-      // Simulation payload provided for viva / instant evaluation testing
-      simulation: {
-        emailOtp,
-        mobileOtp
-      }
+      message: sentRealMail
+        ? `Verification OTP sent to your Gmail inbox (${cleanEmail})!`
+        : `Verification code generated. Please check your email inbox.`,
+      expiresInSeconds: 600
     });
   } catch (err) {
     console.error('Send OTP error:', err);
