@@ -1,0 +1,680 @@
+{
+  "users": [
+    {
+      "id": "usr_student_1",
+      "name": "Vansh Deshmukh",
+      "email": "vansh@jspm.edu",
+      "password": "password123",
+      "role": "student",
+      "rollNo": "CE2025-01",
+      "department": "Computer Engineering",
+      "lastHeartbeat": "2026-10-12T10:36:55.714Z",
+      "isOnline": true,
+      "photoUrl": "/api/profile/photo/usr_student_1.jpg",
+      "createdAt": "2026-09-01T00:00:00Z",
+      "division": "A"
+    },
+    {
+      "id": "usr_student_2",
+      "name": "Jaydeep Dhumal",
+      "email": "jaydeep@jspm.edu",
+      "password": "$2b$10$7vH4q/31G8Im2jW7sfV7POvWALbWKoguYZAIqSomOMUC7nHlkEhOG",
+      "role": "student",
+      "rollNo": "CE2025-02",
+      "department": "Computer Engineering",
+      "lastHeartbeat": "2026-10-12T10:06:59.597Z",
+      "isOnline": false,
+      "createdAt": "2026-09-01T00:00:00Z",
+      "division": "A"
+    },
+    {
+      "id": "usr_student_3",
+      "name": "Omkar Chede",
+      "email": "omkar@jspm.edu",
+      "password": "$2b$10$zzdlvNghfRUQsAtkUfFqauIbaUiy3KtsuqNFK17cbL4/UeP7kshZu",
+      "role": "student",
+      "rollNo": "CE2025-03",
+      "department": "Computer Engineering",
+      "lastHeartbeat": "2026-10-12T10:41:56.782Z",
+      "isOnline": false,
+      "createdAt": "2026-09-01T00:00:00Z",
+      "division": "A"
+    },
+    {
+      "id": "usr_teacher_1",
+      "name": "Prof. Nitin Shivale",
+      "email": "nitin.shivale@jspm.edu",
+      "password": "$2b$10$Z470SpJZHdRnidls74blo.HYZyowin3KRyGxWFlPHlXZV/zW2nW4e",
+      "role": "teacher",
+      "department": "Computer Engineering",
+      "title": "Assistant Professor & Guide",
+      "lastHeartbeat": "2026-10-12T10:41:56.669Z",
+      "isOnline": true,
+      "createdAt": "2026-09-01T00:00:00Z",
+      "divisions": [
+        "A"
+      ]
+    },
+    {
+      "id": "usr_teacher_2",
+      "name": "Prof. Anjali Mehta",
+      "email": "anjali.mehta@jspm.edu",
+      "password": "password123",
+      "role": "teacher",
+      "department": "Computer Engineering",
+      "title": "Associate Professor",
+      "lastHeartbeat": null,
+      "isOnline": false,
+      "createdAt": "2026-09-01T00:00:00Z",
+      "divisions": [
+        "A"
+      ]
+    },
+    {
+      "id": "usr_admin_1",
+      "name": "Dr. Gaytri Bhandari",
+      "email": "admin@jspm.edu",
+      "password": "$2b$10$Uax9kCAWYA8jZEIo8qJwguBuxOJK2X4seuSrGBD00SmLt1F9PkhmW",
+      "role": "admin",
+      "department": "Computer Engineering",
+      "title": "Head of Department & Administrator",
+      "lastHeartbeat": "2026-10-12T10:41:56.461Z",
+      "isOnline": true,
+      "rollNo": "",
+      "photoUrl": "/api/profile/photo/usr_admin_1.jpeg",
+      "createdAt": "2026-09-01T00:00:00Z"
+    },
+    {
+      "id": "usr_teacher_1791800398445",
+      "name": "prof madhavi kulkarni",
+      "email": "madhavikulkurni@gmail.com",
+      "password": "$2b$10$tqT2iahNIAV.gEpRlUmbq.opMeIJu1RkYhGtV2tv7GJQAQeiBAtfu",
+      "role": "teacher",
+      "department": "Computer Engineering",
+      "title": "Assistant Professor",
+      "isOnline": false,
+      "lastHeartbeat": null,
+      "createdAt": "2026-10-12T10:19:58.445Z",
+      "divisions": [
+        "A"
+      ]
+    },
+    {
+      "id": "usr_teacher_1791801128770",
+      "name": "prof shirsh patil",
+      "email": "shrishpatil@gmail.com",
+      "password": "$2b$10$wou9qs/WLa.yJ6I5.V4nxe2vZMRSwssI96iJp2IbfBvpl8VQ2P3DS",
+      "role": "teacher",
+      "department": "Information Technology",
+      "title": "Assistant Professor",
+      "isOnline": false,
+      "lastHeartbeat": null,
+      "createdAt": "2026-10-12T10:32:08.770Z",
+      "divisions": [
+        "A"
+      ]
+    },
+    {
+      "id": "usr_1791801595543",
+      "name": "Hacker",
+      "email": "hacker_1791801595433@jspm.edu",
+      "password": "$2b$10$h8IpSyxDYpLurxvPoYXVXupceSnIJyeEJPPc5/QkV8cWVm7weW1vK",
+      "role": "student",
+      "rollNo": "CE2025-32",
+      "department": "Computer Engineering",
+      "division": "A",
+      "lastHeartbeat": "2026-10-12T10:39:55.543Z",
+      "isOnline": true,
+      "createdAt": "2026-10-12T10:39:55.543Z"
+    },
+    {
+      "id": "usr_1791801716775",
+      "name": "Hacker",
+      "email": "hacker_1791801716671@jspm.edu",
+      "password": "$2b$10$x8HbblU8lzcRM/v9cbzBBOdNiSPr6MwKYrWuKYGzuQ/hrtlnCHto6",
+      "role": "student",
+      "rollNo": "CE2025-16",
+      "department": "Computer Engineering",
+      "division": "A",
+      "lastHeartbeat": "2026-10-12T10:41:56.775Z",
+      "isOnline": true,
+      "createdAt": "2026-10-12T10:41:56.775Z"
+    }
+  ],
+  "assignments": [
+    {
+      "id": "asg_1",
+      "title": "Binary Search Tree Operations",
+      "subject": "Data Structures & Algorithms",
+      "code": "CS301",
+      "deadline": "2026-10-15T23:59:59Z",
+      "languages": [
+        "python",
+        "cpp",
+        "java"
+      ],
+      "minQuizScore": 70,
+      "teacherId": "usr_teacher_1",
+      "description": "Implement a Binary Search Tree (BST) supporting insert(val), search(val), and in_order_traversal(). Optimize for clean recursion and edge handling (empty tree, duplicates).",
+      "starterCode": {
+        "python": "class TreeNode:\n    def __init__(self, val=0):\n        self.val = val\n        self.left = None\n        self.right = None\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n\n    def insert(self, val):\n        # TODO: Implement insert\n        pass\n\n    def search(self, val):\n        # TODO: Implement search\n        return False\n\n    def in_order(self):\n        # TODO: Return list of values\n        return []\n",
+        "cpp": "#include <iostream>\n#include <vector>\n\nstruct TreeNode {\n    int val;\n    TreeNode* left;\n    TreeNode* right;\n    TreeNode(int v) : val(v), left(nullptr), right(nullptr) {}\n};\n\nclass BinarySearchTree {\npublic:\n    TreeNode* root = nullptr;\n    void insert(int val);\n    bool search(int val);\n    std::vector<int> inOrder();\n};\n"
+      }
+    },
+    {
+      "id": "asg_2",
+      "title": "Dijkstra Shortest Path Algorithm",
+      "subject": "Advanced Algorithms",
+      "code": "CS402",
+      "deadline": "2026-10-25T23:59:59Z",
+      "languages": [
+        "python",
+        "cpp"
+      ],
+      "minQuizScore": 75,
+      "teacherId": "usr_teacher_1",
+      "description": "Implement Dijkstra's Single Source Shortest Path on a weighted directed graph using a Min-Heap / Priority Queue. Handle disconnected graphs gracefully.",
+      "starterCode": {
+        "python": "import heapq\n\ndef dijkstra(graph, start_node):\n    # graph is {u: [(v, weight), ...]}\n    # TODO: return shortest distances dict from start_node\n    distances = {start_node: 0}\n    return distances\n"
+      }
+    }
+  ],
+  "submissions": [
+    {
+      "id": "sub_omkar_bst",
+      "assignmentId": "asg_1",
+      "studentId": "usr_student_3",
+      "studentName": "Omkar Chede",
+      "rollNo": "CE2025-03",
+      "language": "python",
+      "submittedAt": "2026-09-18T14:30:00Z",
+      "code": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n\n    def insert(self, val):\n        if not self.root:\n            self.root = TreeNode(val)\n            return\n        curr = self.root\n        while True:\n            if val < curr.val:\n                if not curr.left:\n                    curr.left = TreeNode(val)\n                    break\n                curr = curr.left\n            elif val > curr.val:\n                if not curr.right:\n                    curr.right = TreeNode(val)\n                    break\n                curr = curr.right\n            else:\n                break\n\n    def search(self, val):\n        curr = self.root\n        while curr:\n            if curr.val == val:\n                return True\n            elif val < curr.val:\n                curr = curr.left\n            else:\n                curr = curr.right\n        return False\n\n    def in_order(self):\n        res = []\n        def traverse(node):\n            if not node: return\n            traverse(node.left)\n            res.append(node.val)\n            traverse(node.right)\n        traverse(self.root)\n        return res\n",
+      "tier1Score": 12,
+      "tier1Verdict": "Low Similarity (Unique)",
+      "tier2Score": 8,
+      "tier2Verdict": "Original Independent Work",
+      "quizScore": 92,
+      "quizPassed": true,
+      "githubStatus": "Committed & Pushed",
+      "githubCommitSha": "a8b79e2c451d67",
+      "status": "Approved"
+    }
+  ],
+  "settings": {
+    "geminiApiKey": "",
+    "tier1ThresholdLow": 35,
+    "tier1ThresholdHigh": 75,
+    "defaultMinQuizScore": 70
+  },
+  "subjects": [
+    {
+      "id": "subj_1",
+      "name": "Data Structures & Algorithms",
+      "code": "CS301",
+      "semester": 5,
+      "teacherId": "usr_teacher_1",
+      "department": "Computer Engineering"
+    },
+    {
+      "id": "subj_2",
+      "name": "Advanced Algorithms",
+      "code": "CS402",
+      "semester": 7,
+      "teacherId": "usr_teacher_1",
+      "department": "Computer Engineering"
+    }
+  ],
+  "quizAccessRequests": [
+    {
+      "id": "qar_1790798162815",
+      "studentId": "usr_student_2",
+      "studentName": "Jaydeep Dhumal",
+      "assignmentId": "asg_1",
+      "assignmentTitle": "Binary Search Tree Operations",
+      "teacherId": "usr_teacher_1",
+      "tier1Score": 26,
+      "tier1Verdict": "Low Similarity (Unique)",
+      "tier2Score": null,
+      "tier2Verdict": null,
+      "code": "class TreeNode:\n    def __init__(self, key):\n        self.key = key\n        self.left_child = None\n        self.right_child = None\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root_node = None\n\n    def insert(self, key):\n        def _rec_insert(curr, key):\n            if not curr:\n                return TreeNode(key)\n            if key < curr.key:\n                curr.left_child = _rec_insert(curr.left_child, key)\n            elif key > curr.key:\n                curr.right_child = _rec_insert(curr.right_child, key)\n            return curr\n        self.root_node = _rec_insert(self.root_node, key)\n\n    def search(self, key):\n        curr = self.root_node\n        while curr and curr.key != key:\n            curr = curr.left_child if key < curr.key else curr.right_child\n        return curr is not None\n\n    def in_order(self):\n        res, stack = [], []\n        curr = self.root_node\n        while curr or stack:\n            while curr:\n                stack.append(curr)\n                curr = curr.left_child\n            curr = stack.pop()\n            res.append(curr.key)\n            curr = curr.right_child\n        return res\n",
+      "language": "python",
+      "status": "approved",
+      "requestedAt": "2026-09-30T19:56:02.815Z",
+      "reviewedAt": "2026-10-12T09:49:03.039Z",
+      "reviewNote": null
+    },
+    {
+      "id": "qar_1791798594789",
+      "studentId": "usr_student_2",
+      "studentName": "Jaydeep Dhumal",
+      "assignmentId": "asg_2",
+      "assignmentTitle": "Dijkstra Shortest Path Algorithm",
+      "teacherId": "usr_teacher_1",
+      "tier1Score": 0,
+      "tier1Verdict": "Low Similarity (Unique)",
+      "tier2Score": null,
+      "tier2Verdict": null,
+      "code": "import heapq\n\ndef dijkstra(graph, start_node):\n    # graph is {u: [(v, weight), ...]}\n    # TODO: return shortest distances dict from start_node\n    distances = {start_node: 0}\n    return distances\n",
+      "language": "python",
+      "status": "pending",
+      "requestedAt": "2026-10-12T09:49:54.789Z",
+      "reviewedAt": null,
+      "reviewNote": null
+    }
+  ],
+  "announcements": [
+    {
+      "id": "ann_1",
+      "title": "Welcome to AI Code Validation Platform 2.0",
+      "content": "All students must complete their assignment validations before the deadline. Use the plagiarism checker and pass the AI viva to submit your work.",
+      "authorId": "usr_admin_1",
+      "authorName": "Dr. S. K. Patil",
+      "authorRole": "admin",
+      "targetRoles": [
+        "student",
+        "teacher"
+      ],
+      "createdAt": "2026-09-15T10:00:00Z",
+      "priority": "normal"
+    }
+  ],
+  "activityLogs": [
+    {
+      "id": "log_1790798162819",
+      "action": "quiz_request_created",
+      "userId": "usr_student_2",
+      "userName": "Jaydeep Dhumal",
+      "details": "Requested quiz access for Binary Search Tree Operations",
+      "timestamp": "2026-09-30T19:56:02.819Z"
+    },
+    {
+      "id": "log_1791798543043_review",
+      "action": "quiz_request_approved",
+      "userId": "usr_teacher_1",
+      "userName": "Prof. Nitin Shivale",
+      "details": "Approved quiz request from Jaydeep Dhumal for Binary Search Tree Operations",
+      "timestamp": "2026-10-12T09:49:03.043Z"
+    },
+    {
+      "id": "log_1791798594791",
+      "action": "quiz_request_created",
+      "userId": "usr_student_2",
+      "userName": "Jaydeep Dhumal",
+      "details": "Requested quiz access for Dijkstra Shortest Path Algorithm",
+      "timestamp": "2026-10-12T09:49:54.791Z"
+    }
+  ],
+  "notifications": [
+    {
+      "id": "notif_1790798162818",
+      "userId": "usr_teacher_1",
+      "type": "quiz_request",
+      "title": "New Quiz Access Request",
+      "message": "Jaydeep Dhumal has requested quiz access for Binary Search Tree Operations",
+      "relatedId": "qar_1790798162815",
+      "read": false,
+      "createdAt": "2026-09-30T19:56:02.818Z"
+    },
+    {
+      "id": "notif_1791798543042",
+      "userId": "usr_student_2",
+      "type": "quiz_approved",
+      "title": "Quiz Access Approved!",
+      "message": "Your quiz access for Binary Search Tree Operations has been approved. You can now take the viva.",
+      "relatedId": "qar_1790798162815",
+      "read": false,
+      "createdAt": "2026-10-12T09:49:03.042Z"
+    },
+    {
+      "id": "notif_1791798594790",
+      "userId": "usr_teacher_1",
+      "type": "quiz_request",
+      "title": "New Quiz Access Request",
+      "message": "Jaydeep Dhumal has requested quiz access for Dijkstra Shortest Path Algorithm",
+      "relatedId": "qar_1791798594789",
+      "read": false,
+      "createdAt": "2026-10-12T09:49:54.790Z"
+    },
+    {
+      "id": "notif_1791798925403",
+      "userId": "usr_student_3",
+      "type": "quiz_permission_granted",
+      "title": "Quiz Access Enabled!",
+      "message": "Your teacher has granted you quiz access for assignment asg_1. You can now take the viva.",
+      "relatedId": "qp_1791798925402_lebkdi",
+      "read": false,
+      "createdAt": "2026-10-12T09:55:25.403Z"
+    }
+  ],
+  "departments": [
+    {
+      "id": "dept_1",
+      "name": "Computer Engineering",
+      "code": "CE",
+      "divisions": [
+        "A",
+        "B",
+        "C"
+      ]
+    },
+    {
+      "id": "dept_2",
+      "name": "Information Technology",
+      "code": "IT",
+      "divisions": [
+        "A",
+        "B",
+        "C"
+      ]
+    },
+    {
+      "id": "dept_3",
+      "name": "Electronics Engineering",
+      "code": "ENTC",
+      "divisions": [
+        "A",
+        "B",
+        "C"
+      ]
+    },
+    {
+      "id": "dept_4",
+      "name": "Mechanical Engineering",
+      "code": "ME",
+      "divisions": [
+        "A",
+        "B",
+        "C"
+      ]
+    },
+    {
+      "id": "dept_5",
+      "name": "Civil Engineering",
+      "code": "CIVIL",
+      "divisions": [
+        "A",
+        "B",
+        "C"
+      ]
+    }
+  ],
+  "quizPermissions": [
+    {
+      "id": "perm_1791797822181_1",
+      "studentId": "usr_student_1",
+      "assignmentId": "asg_1",
+      "status": "revoked",
+      "enabledBy": "usr_teacher_1",
+      "enabledAt": "2026-10-12T09:37:02.181Z",
+      "revokedAt": "2026-10-12T09:37:02.181Z"
+    },
+    {
+      "id": "perm_1791797889574_1",
+      "studentId": "usr_student_1",
+      "assignmentId": "asg_1",
+      "status": "revoked",
+      "enabledBy": "usr_teacher_1",
+      "enabledAt": "2026-10-12T09:38:09.574Z",
+      "revokedAt": "2026-10-12T09:38:09.574Z"
+    },
+    {
+      "id": "perm_1791797929677_1",
+      "studentId": "usr_student_1",
+      "assignmentId": "asg_1",
+      "status": "revoked",
+      "enabledBy": "usr_teacher_1",
+      "enabledAt": "2026-10-12T09:38:49.678Z",
+      "revokedAt": "2026-10-12T09:38:49.678Z"
+    },
+    {
+      "id": "qp_1791798543041_6j788q",
+      "studentId": "usr_student_2",
+      "assignmentId": "asg_1",
+      "status": "available",
+      "attemptsUsed": 0,
+      "maxAttempts": 3,
+      "grantedBy": "usr_teacher_1",
+      "grantedAt": "2026-10-12T09:49:03.041Z",
+      "expiresAt": null,
+      "updatedAt": "2026-10-12T09:49:03.051Z"
+    },
+    {
+      "id": "qp_1791798925402_lebkdi",
+      "studentId": "usr_student_3",
+      "assignmentId": "asg_1",
+      "status": "available",
+      "attemptsUsed": 0,
+      "maxAttempts": 3,
+      "grantedBy": "usr_teacher_1",
+      "grantedAt": "2026-10-12T09:55:25.402Z",
+      "expiresAt": null,
+      "updatedAt": "2026-10-12T10:41:56.838Z"
+    },
+    {
+      "id": "perm_1791799062456_1",
+      "studentId": "usr_student_1",
+      "assignmentId": "asg_1",
+      "status": "revoked",
+      "enabledBy": "usr_teacher_1",
+      "enabledAt": "2026-10-12T09:57:42.457Z",
+      "revokedAt": "2026-10-12T09:57:42.458Z"
+    },
+    {
+      "id": "perm_1791799143967_1",
+      "studentId": "usr_student_1",
+      "assignmentId": "asg_test_perm_1791799143967",
+      "status": "revoked",
+      "enabledBy": "usr_teacher_1",
+      "enabledAt": "2026-10-12T09:59:03.967Z",
+      "revokedAt": "2026-10-12T09:59:03.967Z"
+    },
+    {
+      "id": "perm_1791799201576_1",
+      "studentId": "usr_student_1",
+      "assignmentId": "asg_test_perm_1791799201576",
+      "status": "revoked",
+      "enabledBy": "usr_teacher_1",
+      "enabledAt": "2026-10-12T10:00:01.576Z",
+      "revokedAt": "2026-10-12T10:00:01.577Z"
+    },
+    {
+      "id": "perm_1791800245420_1",
+      "studentId": "usr_student_1",
+      "assignmentId": "asg_test_perm_1791800245420",
+      "status": "revoked",
+      "enabledBy": "usr_teacher_1",
+      "enabledAt": "2026-10-12T10:17:25.420Z",
+      "revokedAt": "2026-10-12T10:17:25.421Z"
+    },
+    {
+      "id": "perm_1791801594688_1",
+      "studentId": "usr_student_1",
+      "assignmentId": "asg_test_perm_1791801594688",
+      "status": "revoked",
+      "enabledBy": "usr_teacher_1",
+      "enabledAt": "2026-10-12T10:39:54.688Z",
+      "revokedAt": "2026-10-12T10:39:54.689Z"
+    },
+    {
+      "id": "perm_1791801715997_1",
+      "studentId": "usr_student_1",
+      "assignmentId": "asg_test_perm_1791801715997",
+      "status": "revoked",
+      "enabledBy": "usr_teacher_1",
+      "enabledAt": "2026-10-12T10:41:55.997Z",
+      "revokedAt": "2026-10-12T10:41:55.998Z"
+    }
+  ],
+  "vivaSubmissions": [
+    {
+      "id": "viva_1791797822183",
+      "studentId": "usr_student_3",
+      "assignmentId": "asg_1",
+      "originalSubmissionId": "sub_omkar_bst",
+      "vivaCode": "\nclass BinarySearchTree:\n    def __init__(self):\n        self.root_node = None\n    def insert(self, value):\n        if not self.root_node:\n            self.root_node = TreeNode(value)\n",
+      "jaccardSimilarity": 100,
+      "comparedAt": "2026-10-12T09:37:02.183Z"
+    },
+    {
+      "id": "viva_1791797889577",
+      "studentId": "usr_student_3",
+      "assignmentId": "asg_1",
+      "originalSubmissionId": "sub_omkar_bst",
+      "vivaCode": "\nclass BinarySearchTree:\n    def __init__(self):\n        self.root_node = None\n    def insert(self, value):\n        if not self.root_node:\n            self.root_node = TreeNode(value)\n",
+      "jaccardSimilarity": 63,
+      "comparedAt": "2026-10-12T09:38:09.577Z"
+    },
+    {
+      "id": "viva_1791797929680",
+      "studentId": "usr_student_3",
+      "assignmentId": "asg_1",
+      "originalSubmissionId": "sub_omkar_bst",
+      "vivaCode": "\nclass BinarySearchTree:\n    def __init__(self):\n        self.root_node = None\n    def insert(self, value):\n        if not self.root_node:\n            self.root_node = TreeNode(value)\n",
+      "jaccardSimilarity": 63,
+      "comparedAt": "2026-10-12T09:38:49.680Z"
+    },
+    {
+      "id": "viva_1791798925433",
+      "studentId": "usr_student_3",
+      "studentName": "Omkar Chede",
+      "rollNo": "CE2025-03",
+      "assignmentId": "asg_1",
+      "code": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n    def insert(self, val):\n        pass\n",
+      "language": "python",
+      "similarity": 35,
+      "submittedAt": "2026-10-12T09:55:25.433Z"
+    },
+    {
+      "id": "viva_1791799050726",
+      "studentId": "usr_student_3",
+      "studentName": "Omkar Chede",
+      "rollNo": "CE2025-03",
+      "assignmentId": "asg_1",
+      "code": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n    def insert(self, val):\n        pass\n",
+      "vivaCode": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n    def insert(self, val):\n        pass\n",
+      "language": "python",
+      "similarity": 35,
+      "jaccardSimilarity": 35,
+      "submittedAt": "2026-10-12T09:57:30.726Z"
+    },
+    {
+      "id": "viva_1791799062461",
+      "studentId": "usr_student_3",
+      "assignmentId": "asg_1",
+      "originalSubmissionId": "sub_omkar_bst",
+      "vivaCode": "\nclass BinarySearchTree:\n    def __init__(self):\n        self.root_node = None\n    def insert(self, value):\n        if not self.root_node:\n            self.root_node = TreeNode(value)\n",
+      "jaccardSimilarity": 63,
+      "comparedAt": "2026-10-12T09:57:42.461Z"
+    },
+    {
+      "id": "viva_1791799143970",
+      "studentId": "usr_student_3",
+      "assignmentId": "asg_1",
+      "originalSubmissionId": "sub_omkar_bst",
+      "vivaCode": "\nclass BinarySearchTree:\n    def __init__(self):\n        self.root_node = None\n    def insert(self, value):\n        if not self.root_node:\n            self.root_node = TreeNode(value)\n",
+      "jaccardSimilarity": 63,
+      "comparedAt": "2026-10-12T09:59:03.970Z"
+    },
+    {
+      "id": "viva_1791799153922",
+      "studentId": "usr_student_3",
+      "studentName": "Omkar Chede",
+      "rollNo": "CE2025-03",
+      "assignmentId": "asg_1",
+      "code": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n    def insert(self, val):\n        pass\n",
+      "vivaCode": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n    def insert(self, val):\n        pass\n",
+      "language": "python",
+      "similarity": 35,
+      "jaccardSimilarity": 35,
+      "submittedAt": "2026-10-12T09:59:13.922Z"
+    },
+    {
+      "id": "viva_1791799201580",
+      "studentId": "usr_student_3",
+      "assignmentId": "asg_1",
+      "originalSubmissionId": "sub_omkar_bst",
+      "vivaCode": "\nclass BinarySearchTree:\n    def __init__(self):\n        self.root_node = None\n    def insert(self, value):\n        if not self.root_node:\n            self.root_node = TreeNode(value)\n",
+      "jaccardSimilarity": 63,
+      "comparedAt": "2026-10-12T10:00:01.580Z"
+    },
+    {
+      "id": "viva_1791799202527",
+      "studentId": "usr_student_3",
+      "studentName": "Omkar Chede",
+      "rollNo": "CE2025-03",
+      "assignmentId": "asg_1",
+      "code": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n    def insert(self, val):\n        pass\n",
+      "vivaCode": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n    def insert(self, val):\n        pass\n",
+      "language": "python",
+      "similarity": 35,
+      "jaccardSimilarity": 35,
+      "submittedAt": "2026-10-12T10:00:02.527Z"
+    },
+    {
+      "id": "viva_1791800245422",
+      "studentId": "usr_student_3",
+      "assignmentId": "asg_1",
+      "originalSubmissionId": "sub_omkar_bst",
+      "vivaCode": "\nclass BinarySearchTree:\n    def __init__(self):\n        self.root_node = None\n    def insert(self, value):\n        if not self.root_node:\n            self.root_node = TreeNode(value)\n",
+      "jaccardSimilarity": 63,
+      "comparedAt": "2026-10-12T10:17:25.422Z"
+    },
+    {
+      "id": "viva_1791800246334",
+      "studentId": "usr_student_3",
+      "studentName": "Omkar Chede",
+      "rollNo": "CE2025-03",
+      "assignmentId": "asg_1",
+      "code": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n    def insert(self, val):\n        pass\n",
+      "vivaCode": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n    def insert(self, val):\n        pass\n",
+      "language": "python",
+      "similarity": 35,
+      "jaccardSimilarity": 35,
+      "submittedAt": "2026-10-12T10:17:26.334Z"
+    },
+    {
+      "id": "viva_1791801594691",
+      "studentId": "usr_student_3",
+      "assignmentId": "asg_1",
+      "originalSubmissionId": "sub_omkar_bst",
+      "vivaCode": "\nclass BinarySearchTree:\n    def __init__(self):\n        self.root_node = None\n    def insert(self, value):\n        if not self.root_node:\n            self.root_node = TreeNode(value)\n",
+      "jaccardSimilarity": 63,
+      "comparedAt": "2026-10-12T10:39:54.691Z"
+    },
+    {
+      "id": "viva_1791801595643",
+      "studentId": "usr_student_3",
+      "studentName": "Omkar Chede",
+      "rollNo": "CE2025-03",
+      "assignmentId": "asg_1",
+      "code": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n    def insert(self, val):\n        pass\n",
+      "vivaCode": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n    def insert(self, val):\n        pass\n",
+      "language": "python",
+      "similarity": 35,
+      "jaccardSimilarity": 35,
+      "submittedAt": "2026-10-12T10:39:55.643Z"
+    },
+    {
+      "id": "viva_1791801716001",
+      "studentId": "usr_student_3",
+      "assignmentId": "asg_1",
+      "originalSubmissionId": "sub_omkar_bst",
+      "vivaCode": "\nclass BinarySearchTree:\n    def __init__(self):\n        self.root_node = None\n    def insert(self, value):\n        if not self.root_node:\n            self.root_node = TreeNode(value)\n",
+      "jaccardSimilarity": 63,
+      "comparedAt": "2026-10-12T10:41:56.001Z"
+    },
+    {
+      "id": "viva_1791801716869",
+      "studentId": "usr_student_3",
+      "studentName": "Omkar Chede",
+      "rollNo": "CE2025-03",
+      "assignmentId": "asg_1",
+      "code": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n    def insert(self, val):\n        pass\n",
+      "vivaCode": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n    def insert(self, val):\n        pass\n",
+      "language": "python",
+      "similarity": 35,
+      "jaccardSimilarity": 35,
+      "submittedAt": "2026-10-12T10:41:56.869Z"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "ai-based-code-validation-platform",
+  "version": "2.0.0",
+  "description": "AI-Based Assignment Validation 2.0 - Two-Tier Plagiarism Check and Dynamic Quiz Generation",
+  "scripts": {
+    "dev:server": "node server/index.js",
+    "dev:client": "npm run dev --prefix client",
+    "dev": "node dev-runner.js",
+    "start": "node server/index.js",
+    "test": "npm test --prefix server",
+    "build": "npm run build --prefix client",
+    "install:all": "npm install && npm install --prefix server && npm install --prefix client"
+  },
+  "keywords": ["ai", "plagiarism-detection", "assignment-validation", "gemini-ai", "education"],
+  "author": "JSPM BSIOTR Computer Engineering",
+  "license": "ISC"
+}
