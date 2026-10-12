@@ -15,10 +15,11 @@ import { runTier2Evaluation, generateCodeQuiz } from './services/gemini.js';
 import { generateSubmissionReceipt } from './services/github.js';
 import nodemailer from 'nodemailer';
 
-dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.join(__dirname, '.env') });
+dotenv.config(); // also fallback to root if present
 
 export const app = express();
 const PORT = process.env.PORT || 5000;
