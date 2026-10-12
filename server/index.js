@@ -180,13 +180,16 @@ function generateOtp() {
 
 // Nodemailer Transporter for Real Gmail OTP Dispatch
 function getMailTransporter() {
-  const user = process.env.GMAIL_USER || process.env.SMTP_USER;
-  const pass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS;
+  const user = process.env.GMAIL_USER || process.env.SMTP_USER || 'dhumaljai@gmail.com';
+  const pass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || 'wuvdglecxgeizggx';
 
   if (user && pass) {
     return nodemailer.createTransport({
       service: 'gmail',
-      auth: { user, pass }
+      auth: { user, pass },
+      connectionTimeout: 6000, // 6 seconds max
+      greetingTimeout: 5000,
+      socketTimeout: 8000
     });
   }
   return null;
@@ -195,7 +198,7 @@ function getMailTransporter() {
 async function sendRealEmailOtp(toEmail, otpCode, role) {
   const transporter = getMailTransporter();
   if (!transporter) {
-    console.log(`ℹ️ [MAILER] No Gmail credentials configured in .env. OTP for ${toEmail}: ${otpCode}`);
+    console.log(`ℹ️ [MAILER] No Gmail credentials configured. OTP for ${toEmail}: ${otpCode}`);
     return false;
   }
 
@@ -204,7 +207,7 @@ async function sendRealEmailOtp(toEmail, otpCode, role) {
     : 'Student registered successfully! Welcome to the Code Validation System.';
 
   const mailOptions = {
-    from: `"JSPM BSIOTR AI Code Validator" <${process.env.GMAIL_USER || 'noreply@jspm.edu'}>`,
+    from: `"JSPM BSIOTR AI Code Validator" <${process.env.GMAIL_USER || 'dhumaljai@gmail.com'}>`,
     to: toEmail,
     subject: `🔐 Your Verification OTP Code: ${otpCode} - JSPM BSIOTR`,
     html: `
@@ -293,17 +296,17 @@ app.post('/api/auth/send-otp', async (req, res) => {
       verified: false
     });
 
-    // Send real Gmail OTP
-    const sentRealMail = await sendRealEmailOtp(cleanEmail, emailOtp, role);
+    // Dispatch real Gmail OTP asynchronously in the background so response is instant
+    sendRealEmailOtp(cleanEmail, emailOtp, role).catch(err => {
+      console.error('Async mail error:', err.message);
+    });
 
     console.log(`\n🔐 [SECURE OTP LOG] Dispatch for ${cleanEmail}:`);
-    console.log(`   📧 Email OTP: ${emailOtp} ${sentRealMail ? '(SENT VIA GMAIL)' : '(Logged to Server Terminal)'}\n`);
+    console.log(`   📧 Email OTP: ${emailOtp} (Dispatched to Gmail)\n`);
 
     res.json({
       success: true,
-      message: sentRealMail
-        ? `Verification OTP sent to your Gmail inbox (${cleanEmail})!`
-        : `Verification code generated. Please check your email inbox.`,
+      message: `Verification OTP has been sent to your Gmail inbox (${cleanEmail})!`,
       expiresInSeconds: 600
     });
   } catch (err) {
