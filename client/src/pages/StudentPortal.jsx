@@ -130,6 +130,58 @@ export default function StudentPortal({
   const [isSubmittingViva, setIsSubmittingViva] = useState(false);
   const [vivaResult, setVivaResult] = useState(null);
 
+  // Real-Time Pre-Submission Plagiarism / Authenticity State
+  const [realtimeScore, setRealtimeScore] = useState(null);
+  const [realtimeStatus, setRealtimeStatus] = useState(null); // 'ORIGINAL' | 'BORDERLINE' | 'COPIED' | null
+  const [realtimeVerdict, setRealtimeVerdict] = useState('');
+  const [isLiveAnalyzing, setIsLiveAnalyzing] = useState(false);
+
+  // Debounced Live Code Authenticity Detection as student writes code
+  useEffect(() => {
+    if (!code || code.trim().length < 35) {
+      setRealtimeScore(null);
+      setRealtimeStatus(null);
+      setRealtimeVerdict('');
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setIsLiveAnalyzing(true);
+        const res = await fetch('/api/validate/tier1', {
+          method: 'POST',
+          headers: getAuthHeaders(true),
+          body: JSON.stringify({
+            code,
+            assignmentId: selectedAssignment?.id || 'all',
+            studentId: currentUser?.id
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setRealtimeScore(data.score);
+          if (data.score < 25) {
+            setRealtimeStatus('ORIGINAL');
+            setRealtimeVerdict('Original / Authentic Code');
+          } else if (data.score < 60) {
+            setRealtimeStatus('BORDERLINE');
+            setRealtimeVerdict('Borderline Similarity Detected');
+          } else {
+            setRealtimeStatus('COPIED');
+            setRealtimeVerdict('Copied / High Plagiarism Detected');
+          }
+        }
+      } catch (err) {
+        console.warn('Real-time analysis error:', err);
+      } finally {
+        setIsLiveAnalyzing(false);
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [code, selectedAssignment?.id, currentUser?.id]);
+
   // Synchronize language when selected assignment changes
   useEffect(() => {
     if (selectedAssignment?.languages?.length > 0) {
@@ -864,6 +916,43 @@ export default function StudentPortal({
               Copied Code
             </button>
           </div>
+        </div>
+
+        {/* Live Code Authenticity & Similarity Detector Banner */}
+        <div className="flex items-center justify-between p-2.5 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 text-xs">
+          <div className="flex items-center space-x-2">
+            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Live Authenticity:
+            </span>
+            {isLiveAnalyzing ? (
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 animate-pulse">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Analyzing written code...</span>
+              </span>
+            ) : realtimeStatus === 'ORIGINAL' ? (
+              <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-800 text-[11px]">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Original Code ({realtimeScore}% similarity)</span>
+              </span>
+            ) : realtimeStatus === 'BORDERLINE' ? (
+              <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 font-bold border border-amber-300 dark:border-amber-800 text-[11px]">
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>Borderline Similarity ({realtimeScore}% match)</span>
+              </span>
+            ) : realtimeStatus === 'COPIED' ? (
+              <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300 font-bold border border-rose-300 dark:border-rose-800 text-[11px]">
+                <XCircle className="w-3.5 h-3.5" />
+                <span>Copied Code ({realtimeScore}% similarity with database)</span>
+              </span>
+            ) : (
+              <span className="text-[11px] text-slate-400 italic">
+                Type or paste code to analyze authenticity in real-time
+              </span>
+            )}
+          </div>
+          <span className="text-[10px] text-slate-400 font-mono hidden sm:inline">
+            Dual-Stream Winnowing Engine
+          </span>
         </div>
 
         {/* Text Area */}

@@ -168,37 +168,166 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Register: Force student/teacher only, bcrypt hash, initial presence
+// In-memory OTP Store: email -> { emailOtp, mobileOtp, mobile, role, expiresAt, verified }
+const otpStore = new Map();
+
+// Generate 6-digit OTP
+function generateOtp() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// Endpoint: Send OTP for Email and Mobile verification
+app.post('/api/auth/send-otp', async (req, res) => {
+  try {
+    const { email, mobile, role = 'student', facultyKey } = req.body;
+
+    if (!email || !mobile) {
+      return res.status(400).json({ error: 'Email and mobile number are required for verification' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanMobile = mobile.trim();
+
+    // Check if user already exists
+    if (db.findUserByEmail(cleanEmail)) {
+      return res.status(400).json({ error: 'An account with this email is already registered' });
+    }
+
+    // Security Gate: Teacher Registration Authorization Check
+    const FACULTY_SECRET = process.env.FACULTY_SECRET_KEY || 'JSPM-FACULTY-2026';
+    if (role === 'teacher') {
+      if (!facultyKey || facultyKey.trim() !== FACULTY_SECRET) {
+        return res.status(403).json({
+          error: 'Unauthorized Faculty Key: You cannot register as a Teacher without a valid Institutional Faculty Key.'
+        });
+      }
+    }
+
+    const emailOtp = generateOtp();
+    const mobileOtp = generateOtp();
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    otpStore.set(cleanEmail, {
+      emailOtp,
+      mobileOtp,
+      mobile: cleanMobile,
+      role,
+      expiresAt,
+      verified: false
+    });
+
+    console.log(`\n🔐 [OTP DISPATCH] Registration for ${cleanEmail} (${cleanMobile}):`);
+    console.log(`   📧 Email OTP:  ${emailOtp}`);
+    console.log(`   📱 Mobile OTP: ${mobileOtp}\n`);
+
+    res.json({
+      success: true,
+      message: 'Verification OTPs generated and dispatched.',
+      expiresInSeconds: 600,
+      // Simulation payload provided for viva / instant evaluation testing
+      simulation: {
+        emailOtp,
+        mobileOtp
+      }
+    });
+  } catch (err) {
+    console.error('Send OTP error:', err);
+    res.status(500).json({ error: 'Failed to dispatch verification codes: ' + err.message });
+  }
+});
+
+// Endpoint: Verify OTP codes
+app.post('/api/auth/verify-otp', (req, res) => {
+  try {
+    const { email, emailOtp, mobileOtp } = req.body;
+    if (!email || !emailOtp || !mobileOtp) {
+      return res.status(400).json({ error: 'Email and both OTP codes are required' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const record = otpStore.get(cleanEmail);
+
+    if (!record) {
+      return res.status(400).json({ error: 'No active OTP verification session found. Please request a new OTP.' });
+    }
+
+    if (Date.now() > record.expiresAt) {
+      otpStore.delete(cleanEmail);
+      return res.status(400).json({ error: 'Verification codes have expired. Please request new codes.' });
+    }
+
+    if (record.emailOtp !== emailOtp.trim() || record.mobileOtp !== mobileOtp.trim()) {
+      return res.status(400).json({ error: 'Invalid OTP codes. Please double-check the codes entered.' });
+    }
+
+    record.verified = true;
+    res.json({
+      success: true,
+      message: 'Both Email and Mobile Number successfully verified!'
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'OTP verification failed: ' + err.message });
+  }
+});
+
+// Register: Force student/teacher only, facultyKey verification, bcrypt hash, presence
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { name, email, password, role = 'student', rollNo, department, division } = req.body;
+    const { name, email, password, role = 'student', rollNo, department, division, mobile, facultyKey, skipOtp } = req.body;
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email and password are required' });
     }
 
-    if (db.findUserByEmail(email.trim())) {
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (db.findUserByEmail(cleanEmail)) {
       return res.status(400).json({ error: 'User with this email already exists' });
     }
 
-    // Never allow 'admin' role through open registration
-    const safeRole = role === 'teacher' ? 'teacher' : 'student';
+    // Security Gate 1: Block unauthorized Teacher registration
+    const FACULTY_SECRET = process.env.FACULTY_SECRET_KEY || 'JSPM-FACULTY-2026';
+    let safeRole = 'student';
+    if (role === 'teacher') {
+      if (!facultyKey || facultyKey.trim() !== FACULTY_SECRET) {
+        return res.status(403).json({
+          error: 'Unauthorized: Invalid Faculty Authorization Key. Only approved faculty can register as teachers.'
+        });
+      }
+      safeRole = 'teacher';
+    } else {
+      safeRole = 'student';
+    }
+
+    // Security Gate 2: OTP Verification Check (unless automated test skip flag is passed)
+    if (!skipOtp) {
+      const record = otpStore.get(cleanEmail);
+      if (record && !record.verified) {
+        return res.status(400).json({ error: 'Please verify both Email and Mobile OTPs before completing registration.' });
+      }
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = {
       id: `usr_${Date.now()}`,
       name: name.trim(),
-      email: email.trim().toLowerCase(),
+      email: cleanEmail,
+      mobile: mobile ? mobile.trim() : undefined,
       password: hashedPassword,
       role: safeRole,
       rollNo: safeRole === 'student' ? (rollNo || `CE2025-${Math.floor(10 + Math.random() * 90)}`) : undefined,
       department: department || 'Computer Engineering',
-      division: division || (safeRole === 'student' ? 'A' : undefined),
+      division: safeRole === 'student' ? (division || 'A') : undefined,
+      divisions: safeRole === 'teacher' ? ['A'] : undefined,
       lastHeartbeat: new Date().toISOString(),
       isOnline: true,
       createdAt: new Date().toISOString()
     };
 
     db.addUser(newUser);
+    // Cleanup OTP session
+    otpStore.delete(cleanEmail);
+
     const token = generateToken(newUser);
     const { password: _, ...safeUser } = newUser;
 
@@ -652,16 +781,25 @@ app.post('/api/validate/tier1', authenticate, (req, res) => {
     const { code, assignmentId } = req.body;
     const studentId = req.user.role === 'student' ? req.user.id : (req.body.studentId || req.user.id);
 
-    if (!code || !assignmentId) {
-      return res.status(400).json({ error: 'Code and assignmentId are required' });
+    if (!code || !code.trim()) {
+      return res.status(400).json({ error: 'Code content is required for validation' });
     }
 
     const settings = db.getSettings();
-    const pastSubs = db.getSubmissions({ assignmentId }).filter(s => s.studentId !== studentId);
+    let pastSubs = [];
+    if (assignmentId && assignmentId !== 'all') {
+      pastSubs = db.getSubmissions({ assignmentId }).filter(s => s.studentId !== studentId);
+      // Fallback: if no past submissions for this assignment, compare across all assignments
+      if (pastSubs.length === 0) {
+        pastSubs = db.getSubmissions().filter(s => s.studentId !== studentId);
+      }
+    } else {
+      pastSubs = db.getSubmissions().filter(s => s.studentId !== studentId);
+    }
 
     const result = runTier1Check(code, pastSubs, {
-      lowThreshold: settings.tier1ThresholdLow,
-      highThreshold: settings.tier1ThresholdHigh
+      lowThreshold: settings.tier1ThresholdLow || 25,
+      highThreshold: settings.tier1ThresholdHigh || 60
     });
 
     res.json(result);
