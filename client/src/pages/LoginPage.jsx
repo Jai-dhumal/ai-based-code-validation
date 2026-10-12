@@ -14,11 +14,9 @@ import {
   Sun,
   Moon,
   Layers,
-  Phone,
   KeyRound,
   ShieldCheck,
   RefreshCw,
-  Sparkles,
   ArrowLeft
 } from 'lucide-react';
 
@@ -33,7 +31,6 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
   
   // Sign Up fields
   const [name, setName] = useState('');
-  const [mobile, setMobile] = useState('');
   const [rollNo, setRollNo] = useState('');
   const [division, setDivision] = useState('A');
   const [departments, setDepartments] = useState([]);
@@ -41,11 +38,9 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [facultyKey, setFacultyKey] = useState('');
 
-  // OTP Verification state
-  const [otpStep, setOtpStep] = useState(false); // false: details form, true: enter OTPs
+  // Email OTP Verification state
+  const [otpStep, setOtpStep] = useState(false);
   const [emailOtp, setEmailOtp] = useState('');
-  const [mobileOtp, setMobileOtp] = useState('');
-  const [simulatedOtps, setSimulatedOtps] = useState(null);
   const [otpTimer, setOtpTimer] = useState(600);
 
   const [errorMsg, setErrorMsg] = useState('');
@@ -114,7 +109,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
     }
   };
 
-  // Step 1: Request OTP generation
+  // Step 1: Request Email OTP generation
   const handleRequestOtp = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -123,12 +118,6 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
 
     if (password !== confirmPassword) {
       setErrorMsg('Passwords do not match. Please re-enter.');
-      setIsLoading(false);
-      return;
-    }
-
-    if (!mobile || mobile.trim().length < 10) {
-      setErrorMsg('Please enter a valid 10-digit mobile number.');
       setIsLoading(false);
       return;
     }
@@ -145,7 +134,6 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
-          mobile,
           role,
           facultyKey: role === 'teacher' ? facultyKey : undefined
         })
@@ -153,16 +141,12 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to dispatch verification codes');
-      }
-
-      if (data.simulation) {
-        setSimulatedOtps(data.simulation);
+        throw new Error(data.error || 'Failed to dispatch verification code');
       }
 
       setOtpStep(true);
       setOtpTimer(600);
-      setSuccessMsg('Verification OTPs sent to your Email & Mobile Number!');
+      setSuccessMsg(`Verification OTP sent to your Gmail inbox (${email})!`);
     } catch (err) {
       setErrorMsg(err.message);
     } finally {
@@ -170,34 +154,33 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
     }
   };
 
-  // Step 2: Verify OTPs and Complete Registration
+  // Step 2: Verify Email OTP and Complete Registration
   const handleVerifyOtpAndRegister = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (!emailOtp || !mobileOtp) {
-      setErrorMsg('Please enter both the Email OTP and Mobile OTP.');
+    if (!emailOtp || emailOtp.trim().length !== 6) {
+      setErrorMsg('Please enter the 6-digit OTP code sent to your Gmail inbox.');
       setIsLoading(false);
       return;
     }
 
     try {
-      // 1. Verify OTPs
+      // 1. Verify OTP
       const verifyRes = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
-          emailOtp,
-          mobileOtp
+          emailOtp
         })
       });
 
       const verifyData = await verifyRes.json();
       if (!verifyRes.ok) {
-        throw new Error(verifyData.error || 'OTP verification failed');
+        throw new Error(verifyData.error || 'Invalid OTP code. Please check your Gmail.');
       }
 
       // 2. Complete Registration
@@ -207,7 +190,6 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
         body: JSON.stringify({
           name,
           email,
-          mobile,
           password,
           role,
           facultyKey: role === 'teacher' ? facultyKey : undefined,
@@ -226,7 +208,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
         localStorage.setItem('ai_validate_token', regData.token);
       }
 
-      setSuccessMsg('Account verified & registered successfully! Logging you in...');
+      setSuccessMsg('Student registered successfully! Welcome to the Code Validation System.');
       setTimeout(() => {
         onLoginSuccess(regData.user, regData.token);
       }, 900);
@@ -448,40 +430,20 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    College / Gmail
-                  </label>
-                  <div className="relative">
-                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
-                    <input
-                      type="email"
-                      required
-                      placeholder="student@gmail.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-[#070b14] border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Mobile Number
-                  </label>
-                  <div className="relative">
-                    <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
-                    <input
-                      type="tel"
-                      required
-                      maxLength="10"
-                      placeholder="10-digit number"
-                      value={mobile}
-                      onChange={(e) => setMobile(e.target.value.replace(/\D/g, ''))}
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-[#070b14] border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
-                    />
-                  </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Gmail / College Email (for OTP Verification)
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
+                  <input
+                    type="email"
+                    required
+                    placeholder="yourname@gmail.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-[#070b14] border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
+                  />
                 </div>
               </div>
 
@@ -620,13 +582,13 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                 disabled={isLoading}
                 className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-200 dark:shadow-indigo-900/20 transition disabled:opacity-50 mt-2"
               >
-                <span>{isLoading ? 'Sending Verification Codes...' : 'Verify Mobile & Email (Send OTP)'}</span>
+                <span>{isLoading ? 'Sending Verification Code...' : 'Send Verification OTP to Gmail'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
           )}
 
-          {/* VIEW 3: OTP VERIFICATION STEP */}
+          {/* VIEW 3: EMAIL OTP VERIFICATION STEP */}
           {authMode === 'signup' && otpStep && (
             <form onSubmit={handleVerifyOtpAndRegister} className="space-y-4">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
@@ -639,7 +601,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                   <span>Back</span>
                 </button>
                 <div className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
-                  Step 2 of 2: OTP Verification
+                  Step 2 of 2: Gmail Verification
                 </div>
               </div>
 
@@ -648,13 +610,13 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                   <ShieldCheck className="w-6 h-6" />
                 </div>
                 <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
-                  Verify Email & Mobile OTP
+                  Enter Gmail OTP Code
                 </h3>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Verification codes were sent to <strong>{email}</strong> and <strong>+91 {mobile}</strong>
+                  We sent a 6-digit verification code to <strong>{email}</strong>
                 </p>
                 <div className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 mt-1">
-                  Codes expire in: {formatTimer(otpTimer)}
+                  Code expires in: {formatTimer(otpTimer)}
                 </div>
               </div>
 
@@ -662,7 +624,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
               <div className="p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-900 dark:text-indigo-300 flex items-start gap-2.5">
                 <Mail className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
                 <div className="space-y-0.5">
-                  <p className="font-bold">Confidential Verification Codes Dispatched</p>
+                  <p className="font-bold">Confidential Verification Code Dispatched</p>
                   <p className="text-[11px] text-slate-600 dark:text-slate-400">
                     Your 6-digit OTP has been sent securely to <strong>{email}</strong>. Please check your Gmail inbox (and Spam/Updates folder) to enter the code.
                   </p>
@@ -672,7 +634,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
               {/* Email OTP Input */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Enter 6-Digit Email OTP (Gmail)
+                  Enter 6-Digit Email OTP
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
@@ -680,29 +642,10 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                     type="text"
                     required
                     maxLength="6"
-                    placeholder="Enter 6-digit email OTP"
+                    placeholder="Enter 6-digit code"
                     value={emailOtp}
                     onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, ''))}
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-[#070b14] border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-mono font-bold tracking-widest"
-                  />
-                </div>
-              </div>
-
-              {/* Mobile OTP Input */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Enter 6-Digit Mobile SMS OTP
-                </label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
-                  <input
-                    type="text"
-                    required
-                    maxLength="6"
-                    placeholder="Enter 6-digit mobile OTP"
-                    value={mobileOtp}
-                    onChange={(e) => setMobileOtp(e.target.value.replace(/\D/g, ''))}
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-[#070b14] border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-mono font-bold tracking-widest"
+                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-[#070b14] border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-mono font-bold tracking-widest text-center text-lg"
                   />
                 </div>
               </div>
@@ -712,7 +655,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                 disabled={isLoading}
                 className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-200 dark:shadow-emerald-900/20 transition disabled:opacity-50 mt-3"
               >
-                <span>{isLoading ? 'Verifying & Registering...' : 'Verify OTPs & Complete Registration'}</span>
+                <span>{isLoading ? 'Verifying & Registering...' : 'Verify OTP & Complete Registration'}</span>
                 <CheckCircle2 className="w-4 h-4" />
               </button>
 
@@ -724,7 +667,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                   className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline disabled:opacity-50 disabled:no-underline inline-flex items-center gap-1"
                 >
                   <RefreshCw className="w-3 h-3" />
-                  <span>Resend New OTP Codes</span>
+                  <span>Resend Verification Code</span>
                 </button>
               </div>
             </form>

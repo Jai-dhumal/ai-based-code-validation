@@ -8,7 +8,7 @@
       "role": "student",
       "rollNo": "CE2025-01",
       "department": "Computer Engineering",
-      "lastHeartbeat": "2026-10-12T11:43:50.589Z",
+      "lastHeartbeat": "2026-10-12T12:03:13.046Z",
       "isOnline": true,
       "photoUrl": "/api/profile/photo/usr_student_1.jpg",
       "createdAt": "2026-09-01T00:00:00Z",
@@ -35,7 +35,7 @@
       "role": "student",
       "rollNo": "CE2025-03",
       "department": "Computer Engineering",
-      "lastHeartbeat": "2026-10-12T11:48:51.456Z",
+      "lastHeartbeat": "2026-10-12T12:08:13.929Z",
       "isOnline": false,
       "createdAt": "2026-09-01T00:00:00Z",
       "division": "A"
@@ -48,7 +48,7 @@
       "role": "teacher",
       "department": "Computer Engineering",
       "title": "Assistant Professor & Guide",
-      "lastHeartbeat": "2026-10-12T11:48:51.371Z",
+      "lastHeartbeat": "2026-10-12T12:08:13.843Z",
       "isOnline": true,
       "createdAt": "2026-09-01T00:00:00Z",
       "divisions": [
@@ -78,7 +78,7 @@
       "role": "admin",
       "department": "Computer Engineering",
       "title": "Head of Department & Administrator",
-      "lastHeartbeat": "2026-10-12T11:48:51.180Z",
+      "lastHeartbeat": "2026-10-12T12:08:13.675Z",
       "isOnline": true,
       "rollNo": "",
       "photoUrl": "/api/profile/photo/usr_admin_1.jpeg",
@@ -179,6 +179,32 @@
       "lastHeartbeat": "2026-10-12T11:48:51.445Z",
       "isOnline": true,
       "createdAt": "2026-10-12T11:48:51.445Z"
+    },
+    {
+      "id": "usr_1791806423740",
+      "name": "Hacker",
+      "email": "hacker_1791806423650@jspm.edu",
+      "password": "$2b$10$qCBOR1OVFVcZFowXMZC6HO4RzzpBoCI0snBr7jbMLkxhbaM97XrQu",
+      "role": "student",
+      "rollNo": "CE2025-91",
+      "department": "Computer Engineering",
+      "division": "A",
+      "lastHeartbeat": "2026-10-12T12:00:23.740Z",
+      "isOnline": true,
+      "createdAt": "2026-10-12T12:00:23.740Z"
+    },
+    {
+      "id": "usr_1791806893922",
+      "name": "Hacker",
+      "email": "hacker_1791806893844@jspm.edu",
+      "password": "$2b$10$x1OzKSJ18ZQMZzp834uZLOliM8TZARzUWphLfjQNsLq9bzeU83pWu",
+      "role": "student",
+      "rollNo": "CE2025-93",
+      "department": "Computer Engineering",
+      "division": "A",
+      "lastHeartbeat": "2026-10-12T12:08:13.922Z",
+      "isOnline": true,
+      "createdAt": "2026-10-12T12:08:13.922Z"
     }
   ],
   "assignments": [
@@ -488,7 +514,7 @@
       "grantedBy": "usr_teacher_1",
       "grantedAt": "2026-10-12T09:55:25.402Z",
       "expiresAt": null,
-      "updatedAt": "2026-10-12T11:48:51.533Z"
+      "updatedAt": "2026-10-12T12:08:14.007Z"
     },
     {
       "id": "perm_1791799062456_1",
@@ -561,6 +587,24 @@
       "enabledBy": "usr_teacher_1",
       "enabledAt": "2026-10-12T11:48:50.808Z",
       "revokedAt": "2026-10-12T11:48:50.808Z"
+    },
+    {
+      "id": "perm_1791806423092_1",
+      "studentId": "usr_student_1",
+      "assignmentId": "asg_test_perm_1791806423092",
+      "status": "revoked",
+      "enabledBy": "usr_teacher_1",
+      "enabledAt": "2026-10-12T12:00:23.092Z",
+      "revokedAt": "2026-10-12T12:00:23.093Z"
+    },
+    {
+      "id": "perm_1791806893282_1",
+      "studentId": "usr_student_1",
+      "assignmentId": "asg_test_perm_1791806893282",
+      "status": "revoked",
+      "enabledBy": "usr_teacher_1",
+      "enabledAt": "2026-10-12T12:08:13.282Z",
+      "revokedAt": "2026-10-12T12:08:13.283Z"
     }
   ],
   "vivaSubmissions": [
@@ -777,6 +821,50 @@
       "similarity": 35,
       "jaccardSimilarity": 35,
       "submittedAt": "2026-10-12T11:48:51.565Z"
+    },
+    {
+      "id": "viva_1791806423094",
+      "studentId": "usr_student_3",
+      "assignmentId": "asg_1",
+      "originalSubmissionId": "sub_omkar_bst",
+      "vivaCode": "\nclass BinarySearchTree:\n    def __init__(self):\n        self.root_node = None\n    def insert(self, value):\n        if not self.root_node:\n            self.root_node = TreeNode(value)\n",
+      "jaccardSimilarity": 63,
+      "comparedAt": "2026-10-12T12:00:23.094Z"
+    },
+    {
+      "id": "viva_1791806423845",
+      "studentId": "usr_student_3",
+      "studentName": "Omkar Chede",
+      "rollNo": "CE2025-03",
+      "assignmentId": "asg_1",
+      "code": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n    def insert(self, val):\n        pass\n",
+      "vivaCode": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n    def insert(self, val):\n        pass\n",
+      "language": "python",
+      "similarity": 35,
+      "jaccardSimilarity": 35,
+      "submittedAt": "2026-10-12T12:00:23.845Z"
+    },
+    {
+      "id": "viva_1791806893285",
+      "studentId": "usr_student_3",
+      "assignmentId": "asg_1",
+      "originalSubmissionId": "sub_omkar_bst",
+      "vivaCode": "\nclass BinarySearchTree:\n    def __init__(self):\n        self.root_node = None\n    def insert(self, value):\n        if not self.root_node:\n            self.root_node = TreeNode(value)\n",
+      "jaccardSimilarity": 63,
+      "comparedAt": "2026-10-12T12:08:13.285Z"
+    },
+    {
+      "id": "viva_1791806894039",
+      "studentId": "usr_student_3",
+      "studentName": "Omkar Chede",
+      "rollNo": "CE2025-03",
+      "assignmentId": "asg_1",
+      "code": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n    def insert(self, val):\n        pass\n",
+      "vivaCode": "class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n    def insert(self, val):\n        pass\n",
+      "language": "python",
+      "similarity": 35,
+      "jaccardSimilarity": 35,
+      "submittedAt": "2026-10-12T12:08:14.039Z"
     }
   ]
 }

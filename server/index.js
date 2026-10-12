@@ -199,25 +199,49 @@ async function sendRealEmailOtp(toEmail, otpCode, role) {
     return false;
   }
 
+  const welcomeRoleText = role === 'teacher'
+    ? 'Faculty registered successfully! Welcome to the Code Validation System.'
+    : 'Student registered successfully! Welcome to the Code Validation System.';
+
   const mailOptions = {
     from: `"JSPM BSIOTR AI Code Validator" <${process.env.GMAIL_USER || 'noreply@jspm.edu'}>`,
     to: toEmail,
     subject: `🔐 Your Verification OTP Code: ${otpCode} - JSPM BSIOTR`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
-        <div style="text-align: center; margin-bottom: 20px;">
-          <h2 style="color: #4f46e5; margin: 0;">JSPM BSIOTR Wagholi, Pune</h2>
-          <p style="color: #64748b; font-size: 13px; margin: 4px 0 0 0;">AI-Based Code Validation Platform 2.0</p>
+      <div style="font-family: Arial, sans-serif; max-width: 580px; margin: auto; padding: 32px 24px; border: 2px solid #4f46e5; border-radius: 20px; background-color: #ffffff; box-shadow: 0 10px 25px rgba(0,0,0,0.05);">
+        
+        <!-- Big Bold Header -->
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #1e1b4b; font-size: 24px; font-weight: 900; line-height: 1.3; margin: 0 0 8px 0; text-transform: uppercase;">
+            WELCOME JSPM BHIVRABAI SAWANT INSTITUTE OF RESEARCH AND TECHNOLOGY
+          </h1>
+          <p style="color: #4f46e5; font-size: 15px; font-weight: 700; margin: 0; letter-spacing: 0.5px;">
+            AI-Based Code Validation System 2.0
+          </p>
         </div>
-        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 20px;">
-          <p style="color: #334155; font-size: 14px; margin: 0 0 10px 0;">Your 6-Digit Email Verification Code for <strong>${role.toUpperCase()}</strong> registration is:</p>
-          <div style="font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #4f46e5; font-family: monospace; padding: 10px 0;">
+
+        <!-- Verification OTP Card -->
+        <div style="background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%); border: 1.5px solid #c7d2fe; border-radius: 16px; padding: 28px 20px; text-align: center; margin-bottom: 24px;">
+          <p style="color: #475569; font-size: 14px; font-weight: 600; margin: 0 0 12px 0;">
+            Your One-Time Password (OTP) for account verification is:
+          </p>
+          <div style="font-size: 42px; font-weight: 900; letter-spacing: 10px; color: #4338ca; font-family: monospace; padding: 14px 0; background: #ffffff; border-radius: 12px; border: 1px dashed #6366f1; display: inline-block; min-width: 260px; margin: 6px auto;">
             ${otpCode}
           </div>
-          <p style="color: #ef4444; font-size: 12px; margin: 8px 0 0 0;">Valid for 10 minutes. Do not share this code with anyone.</p>
+          <p style="color: #dc2626; font-size: 12px; font-weight: 600; margin: 12px 0 0 0;">
+            ⏱ Valid for 10 minutes. Please do not share this code.
+          </p>
         </div>
-        <p style="color: #94a3b8; font-size: 11px; text-align: center; margin: 0;">
-          Department of Computer Engineering • Academic Year 2025-26
+
+        <!-- Success Message -->
+        <div style="background-color: #ecfdf5; border: 1.5px solid #a7f3d0; border-radius: 14px; padding: 16px 20px; text-align: center; margin-bottom: 24px;">
+          <p style="color: #065f46; font-size: 16px; font-weight: 800; margin: 0; line-height: 1.4;">
+            ${welcomeRoleText}
+          </p>
+        </div>
+
+        <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 0;">
+          Department of Computer Engineering • Wagholi, Pune - 412207
         </p>
       </div>
     `
@@ -233,17 +257,16 @@ async function sendRealEmailOtp(toEmail, otpCode, role) {
   }
 }
 
-// Endpoint: Send OTP for Email and Mobile verification
+// Endpoint: Send OTP for Email verification
 app.post('/api/auth/send-otp', async (req, res) => {
   try {
-    const { email, mobile, role = 'student', facultyKey } = req.body;
+    const { email, role = 'student', facultyKey } = req.body;
 
-    if (!email || !mobile) {
-      return res.status(400).json({ error: 'Email and mobile number are required for verification' });
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required for verification' });
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const cleanMobile = mobile.trim();
 
     // Check if user already exists
     if (db.findUserByEmail(cleanEmail)) {
@@ -261,13 +284,10 @@ app.post('/api/auth/send-otp', async (req, res) => {
     }
 
     const emailOtp = generateOtp();
-    const mobileOtp = generateOtp();
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
 
     otpStore.set(cleanEmail, {
       emailOtp,
-      mobileOtp,
-      mobile: cleanMobile,
       role,
       expiresAt,
       verified: false
@@ -276,9 +296,8 @@ app.post('/api/auth/send-otp', async (req, res) => {
     // Send real Gmail OTP
     const sentRealMail = await sendRealEmailOtp(cleanEmail, emailOtp, role);
 
-    console.log(`\n🔐 [SECURE OTP LOG] Dispatch for ${cleanEmail} (${cleanMobile}):`);
-    console.log(`   📧 Email OTP:  ${emailOtp} ${sentRealMail ? '(SENT VIA GMAIL)' : '(Logged to Server Terminal)'}`);
-    console.log(`   📱 Mobile OTP: ${mobileOtp} (Logged to Server Terminal)\n`);
+    console.log(`\n🔐 [SECURE OTP LOG] Dispatch for ${cleanEmail}:`);
+    console.log(`   📧 Email OTP: ${emailOtp} ${sentRealMail ? '(SENT VIA GMAIL)' : '(Logged to Server Terminal)'}\n`);
 
     res.json({
       success: true,
@@ -296,9 +315,9 @@ app.post('/api/auth/send-otp', async (req, res) => {
 // Endpoint: Verify OTP codes
 app.post('/api/auth/verify-otp', (req, res) => {
   try {
-    const { email, emailOtp, mobileOtp } = req.body;
-    if (!email || !emailOtp || !mobileOtp) {
-      return res.status(400).json({ error: 'Email and both OTP codes are required' });
+    const { email, emailOtp } = req.body;
+    if (!email || !emailOtp) {
+      return res.status(400).json({ error: 'Email and OTP code are required' });
     }
 
     const cleanEmail = email.trim().toLowerCase();
@@ -310,17 +329,17 @@ app.post('/api/auth/verify-otp', (req, res) => {
 
     if (Date.now() > record.expiresAt) {
       otpStore.delete(cleanEmail);
-      return res.status(400).json({ error: 'Verification codes have expired. Please request new codes.' });
+      return res.status(400).json({ error: 'Verification code has expired. Please request a new code.' });
     }
 
-    if (record.emailOtp !== emailOtp.trim() || record.mobileOtp !== mobileOtp.trim()) {
-      return res.status(400).json({ error: 'Invalid OTP codes. Please double-check the codes entered.' });
+    if (record.emailOtp !== emailOtp.trim()) {
+      return res.status(400).json({ error: 'Invalid OTP code. Please double-check the code entered.' });
     }
 
     record.verified = true;
     res.json({
       success: true,
-      message: 'Both Email and Mobile Number successfully verified!'
+      message: 'Email successfully verified!'
     });
   } catch (err) {
     res.status(500).json({ error: 'OTP verification failed: ' + err.message });
@@ -355,11 +374,11 @@ app.post('/api/auth/register', async (req, res) => {
       safeRole = 'student';
     }
 
-    // Security Gate 2: OTP Verification Check (unless automated test skip flag is passed)
+    // Security Gate 2: Email OTP Verification Check
     if (!skipOtp) {
       const record = otpStore.get(cleanEmail);
       if (record && !record.verified) {
-        return res.status(400).json({ error: 'Please verify both Email and Mobile OTPs before completing registration.' });
+        return res.status(400).json({ error: 'Please verify the Email OTP before completing registration.' });
       }
     }
 
