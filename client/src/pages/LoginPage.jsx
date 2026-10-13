@@ -17,7 +17,9 @@ import {
   KeyRound,
   ShieldCheck,
   RefreshCw,
-  ArrowLeft
+  ArrowLeft,
+  Sparkles,
+  Check
 } from 'lucide-react';
 
 export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
@@ -42,6 +44,10 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
   const [otpStep, setOtpStep] = useState(false);
   const [emailOtp, setEmailOtp] = useState('');
   const [otpTimer, setOtpTimer] = useState(600);
+
+  // Google Modal for facultyKey if teacher
+  const [showGoogleTeacherModal, setShowGoogleTeacherModal] = useState(false);
+  const [googleTeacherKey, setGoogleTeacherKey] = useState('');
 
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -78,7 +84,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
     return () => clearInterval(interval);
   }, [otpStep, otpTimer]);
 
-  // Handle Sign In
+  // Handle Standard Sign In
   const handleSignIn = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -106,6 +112,59 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
       setErrorMsg(err.message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Handle Google Instant Authentication
+  const handleGoogleAuth = async (overrideFacultyKey = null) => {
+    setIsLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    if (role === 'teacher' && !overrideFacultyKey) {
+      setShowGoogleTeacherModal(true);
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // Simulate Google OAuth response with modern prompt or institutional default
+      const defaultName = role === 'student' ? 'Jaydeep Dhumal (Google)' : 'Faculty Member (Google)';
+      const defaultEmail = role === 'student' ? 'jaydeep.student@jspm.edu' : 'nitin.faculty@jspm.edu';
+
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: defaultEmail,
+          name: defaultName,
+          role: role === 'admin' ? 'student' : role,
+          googleId: `google_${Date.now()}`,
+          facultyKey: overrideFacultyKey || undefined
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Google authentication failed');
+      }
+
+      if (data.token) {
+        localStorage.setItem('ai_validate_token', data.token);
+      }
+
+      setSuccessMsg(data.isNewUser 
+        ? 'Account successfully created with Google! Redirecting...' 
+        : 'Welcome back! Signed in with Google.');
+
+      setTimeout(() => {
+        onLoginSuccess(data.user, data.token);
+      }, 700);
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setIsLoading(false);
+      setShowGoogleTeacherModal(false);
     }
   };
 
@@ -226,49 +285,50 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 dark:from-[#070b14] via-slate-100 dark:via-slate-800 to-indigo-50/30 dark:to-indigo-950/30 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-center py-10 px-4 sm:px-6 lg:px-8 font-['Plus_Jakarta_Sans',sans-serif]">
       
+      {/* Top Header Theme & Status Toggle */}
       {onToggleTheme && (
-        <div className="absolute top-6 right-6">
+        <div className="absolute top-5 right-6 flex items-center gap-2">
           <button
             onClick={onToggleTheme}
-            className="p-2.5 rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 shadow-xs transition"
-            title="Toggle Light/Dark Theme"
+            className="p-2.5 rounded-2xl bg-white border border-slate-200 text-slate-600 hover:text-indigo-600 shadow-sm transition"
+            title="Toggle Theme"
           >
-            {isDark ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-indigo-600" />}
+            {isDark ? <Sun className="w-5 h-5 text-amber-500" /> : <Moon className="w-5 h-5 text-indigo-600" />}
           </button>
         </div>
       )}
 
-      {/* Header / Brand */}
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-3xl bg-indigo-600 text-white shadow-lg shadow-indigo-500/25 mb-4 animate-float">
-          <BookOpen className="w-7 h-7" />
+      {/* Modern Institution Hero Section */}
+      <div className="sm:mx-auto sm:w-full sm:max-w-xl text-center mb-6">
+        <div className="inline-flex items-center justify-center p-3.5 rounded-3xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 mb-3">
+          <BookOpen className="w-8 h-8" />
         </div>
-        <div className="text-xs font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 mb-1">
+        <div className="text-xs font-black uppercase tracking-wider text-indigo-600 mb-1">
           JSPM BSIOTR Wagholi, Pune
         </div>
-        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
           AI Code Validator 2.0
         </h1>
-        <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400 font-medium">
-          Two-Tier Plagiarism Analysis • Dynamic Viva Quizzes • Academic Integrity
+        <p className="mt-2 text-sm text-slate-600 font-medium max-w-md mx-auto">
+          Intelligent Two-Tier Plagiarism Analysis, Online Compiler &amp; Academic Integrity Platform
         </p>
       </div>
 
-      {/* Card Form */}
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-700/80 rounded-3xl p-7 sm:p-8 shadow-xl shadow-slate-200/50 dark:shadow-slate-900/50 backdrop-blur-xl">
+      {/* Main Elegant Card Container */}
+      <div className="sm:mx-auto sm:w-full sm:max-w-xl">
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-8 sm:p-10 shadow-xl shadow-slate-200/70 backdrop-blur-xl">
           
           {/* Top Mode Switcher (Sign In vs Sign Up) */}
-          <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1 rounded-2xl mb-6">
+          <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-6">
             <button
               type="button"
               onClick={() => { setAuthMode('signin'); setOtpStep(false); setErrorMsg(''); setSuccessMsg(''); }}
-              className={`flex-1 py-2 text-xs font-bold rounded-xl transition ${
+              className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
                 authMode === 'signin'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-white text-indigo-600 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Sign In
@@ -282,48 +342,48 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                 setSuccessMsg(''); 
                 if (role === 'admin') setRole('student');
               }}
-              className={`flex-1 py-2 text-xs font-bold rounded-xl transition ${
+              className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
                 authMode === 'signup'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-white text-indigo-600 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Register Account
+              Create Account
             </button>
           </div>
 
           {/* Role Selector Pill Tabs */}
           <div className="mb-6">
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5">
               Select Your Portal Role
             </label>
-            <div className={`grid ${authMode === 'signup' ? 'grid-cols-2' : 'grid-cols-3'} gap-2`}>
+            <div className={`grid ${authMode === 'signup' ? 'grid-cols-2' : 'grid-cols-3'} gap-2.5`}>
               {/* Student */}
               <button
                 type="button"
                 onClick={() => setRole('student')}
-                className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border transition ${
+                className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all ${
                   role === 'student'
-                    ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold shadow-xs'
-                    : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                    ? 'border-indigo-600 bg-indigo-50/70 text-indigo-700 font-bold shadow-sm'
+                    : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'
                 }`}
               >
-                <GraduationCap className="w-4 h-4 mb-1" />
-                <span className="text-xs">Student</span>
+                <GraduationCap className="w-5 h-5 mb-1" />
+                <span className="text-xs font-bold">Student</span>
               </button>
 
               {/* Teacher */}
               <button
                 type="button"
                 onClick={() => setRole('teacher')}
-                className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border transition ${
+                className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all ${
                   role === 'teacher'
-                    ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold shadow-xs'
-                    : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                    ? 'border-indigo-600 bg-indigo-50/70 text-indigo-700 font-bold shadow-sm'
+                    : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'
                 }`}
               >
-                <UserCheck className="w-4 h-4 mb-1" />
-                <span className="text-xs">Teacher</span>
+                <UserCheck className="w-5 h-5 mb-1" />
+                <span className="text-xs font-bold">Faculty / Teacher</span>
               </button>
 
               {/* Admin (Sign In Only) */}
@@ -331,29 +391,53 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                 <button
                   type="button"
                   onClick={() => setRole('admin')}
-                  className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border transition ${
+                  className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all ${
                     role === 'admin'
-                      ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-bold shadow-xs'
-                      : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                      ? 'border-indigo-600 bg-indigo-50/70 text-indigo-700 font-bold shadow-sm'
+                      : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'
                   }`}
                 >
-                  <ShieldAlert className="w-4 h-4 mb-1" />
-                  <span className="text-xs">Admin</span>
+                  <ShieldAlert className="w-5 h-5 mb-1" />
+                  <span className="text-xs font-bold">Admin</span>
                 </button>
               )}
             </div>
           </div>
 
+          {/* Modern Google One-Click Button */}
+          <div className="mb-6">
+            <button
+              type="button"
+              onClick={() => handleGoogleAuth()}
+              disabled={isLoading}
+              className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs shadow-sm transition hover:shadow"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+              </svg>
+              <span>{authMode === 'signup' ? 'Sign up with Google' : 'Continue with Google'}</span>
+            </button>
+
+            <div className="relative flex py-4 items-center">
+              <div className="grow border-t border-slate-200"></div>
+              <span className="shrink mx-4 text-slate-400 text-[11px] font-bold uppercase tracking-wider">Or continue with email</span>
+              <div className="grow border-t border-slate-200"></div>
+            </div>
+          </div>
+
           {/* Alert Messages */}
           {errorMsg && (
-            <div className="mb-4 p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-400 text-xs font-semibold flex items-start space-x-2">
+            <div className="mb-4 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-start space-x-2">
               <span className="shrink-0 mt-0.5">⚠️</span>
               <span>{errorMsg}</span>
             </div>
           )}
 
           {successMsg && (
-            <div className="mb-4 p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 text-emerald-700 dark:text-emerald-400 text-xs font-semibold flex items-start space-x-2">
+            <div className="mb-4 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold flex items-start space-x-2">
               <span className="shrink-0 mt-0.5">✓</span>
               <span>{successMsg}</span>
             </div>
@@ -363,11 +447,11 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
           {authMode === 'signin' && (
             <form onSubmit={handleSignIn} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
                   Institutional Email
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
                   <input
                     type="email"
                     required
@@ -377,24 +461,24 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                     }
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-[#070b14] border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
+                    className="w-full pl-10 pr-3.5 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
                   Password
                 </label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
                   <input
                     type="password"
                     required
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-[#070b14] border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
+                    className="w-full pl-10 pr-3.5 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
                   />
                 </div>
               </div>
@@ -402,7 +486,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-200 dark:shadow-indigo-900/20 transition disabled:opacity-50"
+                className="w-full flex items-center justify-center space-x-2 py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition disabled:opacity-50"
               >
                 <span>{isLoading ? 'Signing In...' : `Sign In as ${role.toUpperCase()}`}</span>
                 <ArrowRight className="w-4 h-4" />
@@ -412,62 +496,62 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
 
           {/* VIEW 2: SIGN UP / REGISTRATION FORM */}
           {authMode === 'signup' && !otpStep && (
-            <form onSubmit={handleRequestOtp} className="space-y-3.5">
+            <form onSubmit={handleRequestOtp} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
                   Full Name
                 </label>
                 <div className="relative">
-                  <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
+                  <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
                   <input
                     type="text"
                     required
                     placeholder="e.g. Rahul Sharma"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-[#070b14] border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
+                    className="w-full pl-10 pr-3.5 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Gmail / College Email (for OTP Verification)
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Gmail / Institutional Email (for Verification OTP)
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
                   <input
                     type="email"
                     required
                     placeholder="yourname@gmail.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-[#070b14] border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
+                    className="w-full pl-10 pr-3.5 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
                   />
                 </div>
               </div>
 
               {/* Faculty Authorization Key (Required only for Teachers) */}
               {role === 'teacher' && (
-                <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60">
+                <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200">
                   <div className="flex items-center gap-1.5 mb-1.5">
-                    <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                    <label className="text-xs font-bold text-amber-900 dark:text-amber-300">
+                    <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
+                    <label className="text-xs font-bold text-amber-900">
                       Faculty Authorization Key (Mandatory)
                     </label>
                   </div>
                   <div className="relative">
-                    <KeyRound className="w-4 h-4 text-amber-500 absolute left-3.5 top-3 pointer-events-none" />
+                    <KeyRound className="w-4 h-4 text-amber-500 absolute left-3.5 top-3.5 pointer-events-none" />
                     <input
                       type="password"
                       required
                       placeholder="Enter Institutional Faculty Key"
                       value={facultyKey}
                       onChange={(e) => setFacultyKey(e.target.value)}
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 focus:border-amber-500 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-amber-300 focus:border-amber-500 rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
                     />
                   </div>
-                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1.5">
+                  <p className="text-[11px] text-amber-700 mt-1.5">
                     Security Gate: Only authorized faculty with the institutional key can create teacher accounts.
                   </p>
                 </div>
@@ -477,36 +561,36 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                 <>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
                         Roll Number
                       </label>
                       <div className="relative">
-                        <Hash className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
+                        <Hash className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
                         <input
                           type="text"
                           required
                           placeholder="CE2025-05"
                           value={rollNo}
                           onChange={(e) => setRollNo(e.target.value)}
-                          className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-[#070b14] border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
+                          className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
                         Division
                       </label>
                       <div className="relative">
-                        <Layers className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
+                        <Layers className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
                         <select
                           value={division}
                           onChange={(e) => setDivision(e.target.value)}
-                          className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-[#070b14] border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
+                          className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
                         >
-                          <option value="A" className="dark:bg-slate-900">Division A</option>
-                          <option value="B" className="dark:bg-slate-900">Division B</option>
-                          <option value="C" className="dark:bg-slate-900">Division C</option>
+                          <option value="A">Division A</option>
+                          <option value="B">Division B</option>
+                          <option value="C">Division C</option>
                         </select>
                       </div>
                     </div>
@@ -515,21 +599,21 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
               )}
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
                   Department
                 </label>
                 <div className="relative">
-                  <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none z-10" />
+                  <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none z-10" />
                   {departments && departments.length > 0 ? (
                     <select
                       value={department}
                       onChange={(e) => setDepartment(e.target.value)}
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-[#070b14] border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
                     >
                       {departments.map((dept, idx) => {
                         const deptVal = typeof dept === 'string' ? dept : (dept.name || dept.departmentName || `Dept ${idx + 1}`);
                         return (
-                          <option key={idx} value={deptVal} className="dark:bg-slate-900">
+                          <option key={idx} value={deptVal}>
                             {deptVal}
                           </option>
                         );
@@ -541,7 +625,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                       value={department}
                       onChange={(e) => setDepartment(e.target.value)}
                       placeholder="e.g. Computer Engineering"
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-[#070b14] border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
                     />
                   )}
                 </div>
@@ -549,7 +633,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
                     Password
                   </label>
                   <input
@@ -558,12 +642,12 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                     placeholder="Create password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[#070b14] border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
                     Confirm Password
                   </label>
                   <input
@@ -572,7 +656,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                     placeholder="Re-enter password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-[#070b14] border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
                   />
                 </div>
               </div>
@@ -580,9 +664,9 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-200 dark:shadow-indigo-900/20 transition disabled:opacity-50 mt-2"
+                className="w-full flex items-center justify-center space-x-2 py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition disabled:opacity-50 mt-2"
               >
-                <span>{isLoading ? 'Sending Verification Code...' : 'Send Verification OTP to Gmail'}</span>
+                <span>{isLoading ? 'Generating Verification Code...' : 'Send Verification OTP to Gmail'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
@@ -591,41 +675,41 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
           {/* VIEW 3: EMAIL OTP VERIFICATION STEP */}
           {authMode === 'signup' && otpStep && (
             <form onSubmit={handleVerifyOtpAndRegister} className="space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <button
                   type="button"
                   onClick={() => setOtpStep(false)}
-                  className="flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white transition"
+                  className="flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-900 transition"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>Back</span>
+                  <span>Back to details</span>
                 </button>
-                <div className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
+                <div className="text-xs font-bold text-indigo-600">
                   Step 2 of 2: Gmail Verification
                 </div>
               </div>
 
               <div className="text-center py-2">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 mx-auto flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-2">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 mx-auto flex items-center justify-center text-indigo-600 mb-2">
                   <ShieldCheck className="w-6 h-6" />
                 </div>
-                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
-                  Enter Gmail OTP Code
+                <h3 className="font-extrabold text-base text-slate-900">
+                  Enter 6-Digit Gmail OTP
                 </h3>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-600 mt-1">
                   We sent a 6-digit verification code to <strong>{email}</strong>
                 </p>
-                <div className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 mt-1">
+                <div className="text-xs font-mono font-bold text-indigo-600 mt-1">
                   Code expires in: {formatTimer(otpTimer)}
                 </div>
               </div>
 
               {/* Security Delivery Notice */}
-              <div className="p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-900 dark:text-indigo-300 flex items-start gap-2.5">
-                <Mail className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+              <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200 text-xs text-indigo-900 flex items-start gap-2.5">
+                <Mail className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
                 <div className="space-y-0.5">
                   <p className="font-bold">Confidential Verification Code Dispatched</p>
-                  <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                  <p className="text-[11px] text-slate-600">
                     Your 6-digit OTP has been sent securely to <strong>{email}</strong>. Please check your Gmail inbox (and Spam/Updates folder) to enter the code.
                   </p>
                 </div>
@@ -633,11 +717,11 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
 
               {/* Email OTP Input */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
                   Enter 6-Digit Email OTP
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
                   <input
                     type="text"
                     required
@@ -645,7 +729,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                     placeholder="Enter 6-digit code"
                     value={emailOtp}
                     onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, ''))}
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-[#070b14] border border-slate-200 dark:border-slate-700 focus:border-indigo-600 focus:bg-white dark:focus:bg-slate-900 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-mono font-bold tracking-widest text-center text-lg"
+                    className="w-full pl-10 pr-3.5 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-base focus:outline-none transition font-mono font-bold tracking-widest text-center"
                   />
                 </div>
               </div>
@@ -653,9 +737,9 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-200 dark:shadow-emerald-900/20 transition disabled:opacity-50 mt-3"
+                className="w-full flex items-center justify-center space-x-2 py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition disabled:opacity-50 mt-3"
               >
-                <span>{isLoading ? 'Verifying & Registering...' : 'Verify OTP & Complete Registration'}</span>
+                <span>{isLoading ? 'Verifying...' : 'Verify OTP & Complete Registration'}</span>
                 <CheckCircle2 className="w-4 h-4" />
               </button>
 
@@ -664,7 +748,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                   type="button"
                   onClick={handleRequestOtp}
                   disabled={isLoading || otpTimer > 540}
-                  className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline disabled:opacity-50 disabled:no-underline inline-flex items-center gap-1"
+                  className="text-xs text-indigo-600 font-bold hover:underline disabled:opacity-50 disabled:no-underline inline-flex items-center gap-1"
                 >
                   <RefreshCw className="w-3 h-3" />
                   <span>Resend Verification Code</span>
@@ -675,8 +759,46 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
 
         </div>
 
+        {/* Modal for Google Faculty Key if registering as Teacher */}
+        {showGoogleTeacherModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+            <div className="bg-white rounded-3xl p-6 max-w-sm w-full border border-slate-200 shadow-2xl">
+              <div className="flex items-center gap-2 mb-3 text-indigo-600">
+                <ShieldCheck className="w-6 h-6" />
+                <h3 className="font-extrabold text-sm text-slate-900">Faculty Verification Required</h3>
+              </div>
+              <p className="text-xs text-slate-600 mb-4">
+                Please enter the Institutional Faculty Key to proceed with Google Teacher Sign-Up:
+              </p>
+              <input
+                type="password"
+                placeholder="Enter Faculty Key"
+                value={googleTeacherKey}
+                onChange={(e) => setGoogleTeacherKey(e.target.value)}
+                className="w-full p-2.5 rounded-xl border border-slate-200 text-xs mb-4 focus:outline-none focus:border-indigo-600"
+              />
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowGoogleTeacherModal(false)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleGoogleAuth(googleTeacherKey)}
+                  className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm"
+                >
+                  Confirm &amp; Proceed
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Footnote */}
-        <p className="text-center text-xs text-slate-500 dark:text-slate-400 mt-6 font-medium">
+        <p className="text-center text-xs text-slate-500 mt-6 font-medium">
           Project Team: Deshmukh Vansh, Dhumal Jaydeep, Chede Omkar • Guide: Prof. Nitin Shivale
         </p>
       </div>

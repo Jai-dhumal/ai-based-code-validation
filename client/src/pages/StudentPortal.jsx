@@ -21,12 +21,17 @@ import {
   RotateCcw,
   Gauge,
   Layers,
-  ChevronRight
+  ChevronRight,
+  Maximize2,
+  Minimize2,
+  Play,
+  Terminal
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import QuizModal from '../components/QuizModal.jsx';
 import SubmissionReceiptModal from '../components/SubmissionReceiptModal.jsx';
 import Tier2Modal from '../components/Tier2Modal.jsx';
+import CompilerPanel from '../components/CompilerPanel.jsx';
 
 // Sample codes for quick testing
 const DEMO_PRESETS = {
@@ -135,6 +140,13 @@ export default function StudentPortal({
   const [realtimeStatus, setRealtimeStatus] = useState(null); // 'ORIGINAL' | 'BORDERLINE' | 'COPIED' | null
   const [realtimeVerdict, setRealtimeVerdict] = useState('');
   const [isLiveAnalyzing, setIsLiveAnalyzing] = useState(false);
+
+  // LeetCode-Style Resizable & Fullscreen IDE State
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showConsole, setShowConsole] = useState(false);
+  const [consoleOutput, setConsoleOutput] = useState(null);
+  const [isRunningCode, setIsRunningCode] = useState(false);
+  const [stdinInput, setStdinInput] = useState('');
 
   // Debounced Live Code Authenticity Detection as student writes code
   useEffect(() => {
@@ -335,7 +347,42 @@ export default function StudentPortal({
   const currentSubmission = (submissions || []).find(
     s => s.assignmentId === selectedAssignment.id && s.studentId === currentUser?.id
   );
-  const hasSubmittedCurrentAssignment = Boolean(currentSubmission || receipt);
+  // RUN & COMPILE CODE (Instant Execution)
+  const handleRunCode = async () => {
+    if (!code || !code.trim()) {
+      alert('Please enter code before running.');
+      return;
+    }
+
+    setIsRunningCode(true);
+    setShowConsole(true);
+    setConsoleOutput(null);
+
+    try {
+      const res = await fetch('/api/compile', {
+        method: 'POST',
+        headers: getAuthHeaders(true),
+        body: JSON.stringify({
+          language: selectedLanguage,
+          code,
+          stdin: stdinInput || ''
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Execution failed');
+      setConsoleOutput(data);
+    } catch (err) {
+      setConsoleOutput({
+        stdout: '',
+        stderr: err.message,
+        status: 'Runtime Error',
+        time: '0.00'
+      });
+    } finally {
+      setIsRunningCode(false);
+    }
+  };
 
   // STEP 1: Check Plagiarism
   const handleCheckPlagiarism = async () => {
@@ -896,51 +943,61 @@ export default function StudentPortal({
             <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">Try Demo:</span>
             <button
               onClick={() => setCode(DEMO_PRESETS.original.code)}
-              className="text-[11px] px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 font-semibold transition card-float"
+              className="text-[11px] px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-semibold transition card-float"
               title="Loads clean, original code"
             >
               Original Code
             </button>
             <button
               onClick={() => setCode(DEMO_PRESETS.borderline.code)}
-              className="text-[11px] px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 font-semibold transition card-float"
+              className="text-[11px] px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-semibold transition card-float"
               title="Loads modified code with renamed variables"
             >
               Borderline Code
             </button>
             <button
               onClick={() => setCode(DEMO_PRESETS.copied.code)}
-              className="text-[11px] px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 font-semibold transition card-float"
+              className="text-[11px] px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-semibold transition card-float"
               title="Loads exact copied code"
             >
               Copied Code
+            </button>
+
+            {/* LeetCode Fullscreen / Minimize Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsFullscreen(prev => !prev)}
+              className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-50 transition ml-2"
+              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen (LeetCode Mode)'}
+            >
+              {isFullscreen ? <Minimize2 className="w-4 h-4 text-indigo-600" /> : <Maximize2 className="w-4 h-4" />}
             </button>
           </div>
         </div>
 
         {/* Live Code Authenticity & Similarity Detector Banner */}
-        <div className="flex items-center justify-between p-2.5 px-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 text-xs">
+        <div className="flex items-center justify-between p-2.5 px-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
           <div className="flex items-center space-x-2">
-            <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
               Live Authenticity:
             </span>
             {isLiveAnalyzing ? (
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 animate-pulse">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 animate-pulse">
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>Analyzing written code...</span>
               </span>
             ) : realtimeStatus === 'ORIGINAL' ? (
-              <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-800 text-[11px]">
+              <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-300 text-[11px]">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Original Code ({realtimeScore}% similarity)</span>
               </span>
             ) : realtimeStatus === 'BORDERLINE' ? (
-              <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 font-bold border border-amber-300 dark:border-amber-800 text-[11px]">
+              <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold border border-amber-300 text-[11px]">
                 <AlertCircle className="w-3.5 h-3.5" />
                 <span>Borderline Similarity ({realtimeScore}% match)</span>
               </span>
             ) : realtimeStatus === 'COPIED' ? (
-              <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300 font-bold border border-rose-300 dark:border-rose-800 text-[11px]">
+              <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold border border-rose-300 text-[11px]">
                 <XCircle className="w-3.5 h-3.5" />
                 <span>Copied Code ({realtimeScore}% similarity with database)</span>
               </span>
@@ -955,28 +1012,112 @@ export default function StudentPortal({
           </span>
         </div>
 
-        {/* Text Area */}
-        <div className="relative">
+        {/* Text Area (with LeetCode full-screen container) */}
+        <div className={`relative ${isFullscreen ? 'fixed inset-0 z-50 bg-slate-900 p-6 flex flex-col justify-between' : ''}`}>
+          {isFullscreen && (
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+              <div className="flex items-center gap-2 text-white font-bold text-sm">
+                <Code2 className="w-4 h-4 text-indigo-400" />
+                <span>{selectedAssignment?.title || 'Coding IDE'} — LeetCode Fullscreen Mode</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleRunCode}
+                  disabled={isRunningCode}
+                  className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  <span>{isRunningCode ? 'Running...' : 'Run Code'}</span>
+                </button>
+                <button
+                  onClick={() => setIsFullscreen(false)}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center gap-1"
+                >
+                  <Minimize2 className="w-3.5 h-3.5" />
+                  <span>Exit Fullscreen</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           <textarea
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            rows="12"
-            placeholder="Write or paste your code here..."
+            rows={isFullscreen ? 24 : 14}
+            placeholder="Write or paste your code here... (Click 'Run & Compile Code' to test execution)"
             spellCheck="false"
-            className="w-full p-4 bg-slate-900 text-emerald-400 font-['Fira_Code',monospace] text-xs rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 leading-relaxed shadow-inner"
+            className={`w-full p-4 bg-slate-900 text-emerald-400 font-['Fira_Code',monospace] text-xs rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 leading-relaxed shadow-inner ${isFullscreen ? 'grow resize-none mb-3' : 'resize-y min-h-[220px]'}`}
           />
+
+          {/* Collapsible Console Drawer inside Editor */}
+          {showConsole && (
+            <div className="mt-3 p-4 bg-slate-950 rounded-2xl border border-slate-800 text-xs font-mono">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-slate-400 mb-2">
+                <span className="flex items-center gap-1.5 font-bold text-slate-200">
+                  <Terminal className="w-3.5 h-3.5 text-indigo-400" />
+                  Compiler Console &amp; Test Output
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowConsole(false)}
+                  className="text-slate-500 hover:text-slate-300 text-[11px]"
+                >
+                  Close Console ✕
+                </button>
+              </div>
+
+              {isRunningCode ? (
+                <div className="text-indigo-400 animate-pulse py-2">Compiling and executing code...</div>
+              ) : consoleOutput ? (
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${consoleOutput.status === 'Accepted' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'}`}>
+                      {consoleOutput.status}
+                    </span>
+                    {consoleOutput.time && <span className="text-[10px] text-slate-500">{consoleOutput.time}s</span>}
+                  </div>
+                  {consoleOutput.stdout && (
+                    <pre className="text-emerald-400 whitespace-pre-wrap">{consoleOutput.stdout}</pre>
+                  )}
+                  {consoleOutput.stderr && (
+                    <pre className="text-rose-400 whitespace-pre-wrap">{consoleOutput.stderr}</pre>
+                  )}
+                  {!consoleOutput.stdout && !consoleOutput.stderr && (
+                    <span className="text-slate-500 italic">Program finished with no output.</span>
+                  )}
+                </div>
+              ) : (
+                <span className="text-slate-500 italic">Click 'Run &amp; Compile Code' below to execute solution.</span>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Step 1 Button: Check Plagiarism */}
-        <div className="flex items-center justify-between pt-2">
-          <span className="text-xs text-slate-500 dark:text-slate-400">
-            Click to check similarity against other students' work.
-          </span>
+        {/* Action Controls: Run Code & Step 1 Check Plagiarism */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRunCode}
+              disabled={isRunningCode || !code.trim()}
+              className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs shadow-sm transition disabled:opacity-50"
+            >
+              <Play className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{isRunningCode ? 'Running...' : 'Run & Compile Code'}</span>
+            </button>
+
+            <button
+              onClick={() => setShowConsole(prev => !prev)}
+              className="flex items-center space-x-1 px-3 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold text-xs transition"
+            >
+              <Terminal className="w-3.5 h-3.5" />
+              <span>Console</span>
+            </button>
+          </div>
 
           <button
             onClick={handleCheckPlagiarism}
             disabled={isCheckingPlag}
-            className="flex items-center space-x-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-500/20 transition disabled:opacity-50 card-float"
+            className="flex items-center space-x-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition disabled:opacity-50 card-float"
           >
             <Sparkles className="w-4 h-4" />
             <span>{isCheckingPlag ? 'Checking Plagiarism...' : 'Step 1: Check Plagiarism'}</span>
