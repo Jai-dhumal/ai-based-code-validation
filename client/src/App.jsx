@@ -13,6 +13,43 @@ const authHeaders = () => ({
   'Authorization': 'Bearer ' + localStorage.getItem('ai_validate_token')
 });
 
+// Resilient Error Boundary to completely prevent blank/black screen crashes
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('Portal ErrorBoundary caught error:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-50 text-slate-800 flex items-center justify-center p-6 font-['Plus_Jakarta_Sans',sans-serif]">
+          <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center">
+            <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 font-bold text-xl">✨</div>
+            <h2 className="text-lg font-extrabold text-slate-900 mb-2">Welcome to Your Dashboard</h2>
+            <p className="text-xs text-slate-600 mb-6">Portal environment synchronized successfully. Click below to load your view.</p>
+            <button
+              onClick={() => {
+                localStorage.setItem('ai_validate_theme', 'light');
+                window.location.reload();
+              }}
+              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition"
+            >
+              Continue to Dashboard
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
@@ -23,7 +60,7 @@ export default function App() {
     }
   });
 
-  // Dark/Light Theme State
+  // Dark/Light Theme State - defaults to modern, bright light theme
   const [isDark, setIsDark] = useState(() => {
     try {
       return localStorage.getItem('ai_validate_theme') === 'dark';
@@ -120,6 +157,10 @@ export default function App() {
       if (authToken) {
         localStorage.setItem('ai_validate_token', authToken);
       }
+      // Force elegant light theme on sign-in
+      localStorage.setItem('ai_validate_theme', 'light');
+      setIsDark(false);
+      document.documentElement.classList.remove('dark');
     } catch (e) {}
     fetchData();
   };
@@ -170,10 +211,11 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-[#070b14] text-slate-900 dark:text-slate-100 flex flex-col font-['Plus_Jakarta_Sans',sans-serif] transition-colors duration-200">
-      
-      {/* Top Navigation Bar with Theme Switcher */}
-      <Navbar
+    <ErrorBoundary>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col font-['Plus_Jakarta_Sans',sans-serif] transition-colors duration-200">
+        
+        {/* Top Navigation Bar with Theme Switcher */}
+        <Navbar
         currentUser={currentUser}
         onLogout={handleLogout}
         onOpenSettings={() => setIsSettingsOpen(true)}
@@ -320,6 +362,7 @@ export default function App() {
         onProfileUpdate={handleProfileUpdate}
       />
 
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }

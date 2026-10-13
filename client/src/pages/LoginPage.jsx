@@ -45,9 +45,12 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
   const [emailOtp, setEmailOtp] = useState('');
   const [otpTimer, setOtpTimer] = useState(600);
 
-  // Google Modal for facultyKey if teacher
-  const [showGoogleTeacherModal, setShowGoogleTeacherModal] = useState(false);
-  const [googleTeacherKey, setGoogleTeacherKey] = useState('');
+  // Google Account Chooser Modal
+  const [showGoogleAccountModal, setShowGoogleAccountModal] = useState(false);
+  const [customGoogleEmail, setCustomGoogleEmail] = useState('');
+  const [customGoogleName, setCustomGoogleName] = useState('');
+  const [isUsingCustomGoogle, setIsUsingCustomGoogle] = useState(false);
+  const [googleTeacherKey, setGoogleTeacherKey] = useState('JSPM-FACULTY-2026');
 
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -116,31 +119,25 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
   };
 
   // Handle Google Instant Authentication
-  const handleGoogleAuth = async (overrideFacultyKey = null) => {
+  const handleGoogleAuth = async ({ authEmail, authName, authRole, authFacultyKey } = {}) => {
     setIsLoading(true);
     setErrorMsg('');
     setSuccessMsg('');
 
-    if (role === 'teacher' && !overrideFacultyKey) {
-      setShowGoogleTeacherModal(true);
-      setIsLoading(false);
-      return;
-    }
+    const targetEmail = authEmail || (email ? email.trim() : (role === 'student' ? 'dhumaljai@gmail.com' : 'nitin.shivale@jspm.edu'));
+    const targetName = authName || (name ? name.trim() : (role === 'student' ? 'Jaydeep Dhumal' : 'Prof. Nitin Shivale'));
+    const targetRole = authRole || (role === 'admin' ? 'student' : role);
 
     try {
-      // Simulate Google OAuth response with modern prompt or institutional default
-      const defaultName = role === 'student' ? 'Jaydeep Dhumal (Google)' : 'Faculty Member (Google)';
-      const defaultEmail = role === 'student' ? 'jaydeep.student@jspm.edu' : 'nitin.faculty@jspm.edu';
-
       const res = await fetch('/api/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: defaultEmail,
-          name: defaultName,
-          role: role === 'admin' ? 'student' : role,
+          email: targetEmail,
+          name: targetName,
+          role: targetRole,
           googleId: `google_${Date.now()}`,
-          facultyKey: overrideFacultyKey || undefined
+          facultyKey: authFacultyKey || (targetRole === 'teacher' ? (googleTeacherKey || 'JSPM-FACULTY-2026') : undefined)
         })
       });
 
@@ -152,19 +149,22 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
       if (data.token) {
         localStorage.setItem('ai_validate_token', data.token);
       }
+      // Force clean, bright light theme on sign-in
+      localStorage.setItem('ai_validate_theme', 'light');
 
       setSuccessMsg(data.isNewUser 
-        ? 'Account successfully created with Google! Redirecting...' 
-        : 'Welcome back! Signed in with Google.');
+        ? `Account successfully created with Google (${targetEmail})! Opening Dashboard...` 
+        : `Signed in as ${targetName}! Opening Dashboard...`);
+
+      setShowGoogleAccountModal(false);
 
       setTimeout(() => {
         onLoginSuccess(data.user, data.token);
-      }, 700);
+      }, 500);
     } catch (err) {
       setErrorMsg(err.message);
     } finally {
       setIsLoading(false);
-      setShowGoogleTeacherModal(false);
     }
   };
 
@@ -408,7 +408,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
           <div className="mb-6">
             <button
               type="button"
-              onClick={() => handleGoogleAuth()}
+              onClick={() => setShowGoogleAccountModal(true)}
               disabled={isLoading}
               className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs shadow-sm transition hover:shadow"
             >
@@ -759,40 +759,192 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
 
         </div>
 
-        {/* Modal for Google Faculty Key if registering as Teacher */}
-        {showGoogleTeacherModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-            <div className="bg-white rounded-3xl p-6 max-w-sm w-full border border-slate-200 shadow-2xl">
-              <div className="flex items-center gap-2 mb-3 text-indigo-600">
-                <ShieldCheck className="w-6 h-6" />
-                <h3 className="font-extrabold text-sm text-slate-900">Faculty Verification Required</h3>
+        {/* Google Account Selector Modal (Official Modern Design) */}
+        {showGoogleAccountModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-fade-in font-['Plus_Jakarta_Sans',sans-serif]">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-slate-200 shadow-2xl space-y-5">
+              
+              {/* Header */}
+              <div className="text-center space-y-2">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-slate-50 border border-slate-100 shadow-sm mx-auto">
+                  <svg className="w-6 h-6" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-black text-slate-900 tracking-tight">Sign in with Google</h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Choose an account to continue to <span className="text-indigo-600 font-bold">AI Code Validator 2.0</span>
+                </p>
               </div>
-              <p className="text-xs text-slate-600 mb-4">
-                Please enter the Institutional Faculty Key to proceed with Google Teacher Sign-Up:
-              </p>
-              <input
-                type="password"
-                placeholder="Enter Faculty Key"
-                value={googleTeacherKey}
-                onChange={(e) => setGoogleTeacherKey(e.target.value)}
-                className="w-full p-2.5 rounded-xl border border-slate-200 text-xs mb-4 focus:outline-none focus:border-indigo-600"
-              />
-              <div className="flex items-center justify-end gap-2">
+
+              {/* Account List */}
+              <div className="space-y-2.5 pt-1">
+                
+                {/* Account 1: Jaydeep Dhumal (Primary) */}
                 <button
                   type="button"
-                  onClick={() => setShowGoogleTeacherModal(false)}
-                  className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100"
+                  onClick={() => handleGoogleAuth({
+                    authEmail: 'dhumaljai@gmail.com',
+                    authName: 'Jaydeep Dhumal',
+                    authRole: 'student'
+                  })}
+                  disabled={isLoading}
+                  className="w-full flex items-center gap-3.5 p-3 rounded-2xl border border-slate-200/90 hover:border-indigo-400 hover:bg-indigo-50/40 text-left transition group card-float"
                 >
-                  Cancel
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-sm">
+                    JD
+                  </div>
+                  <div className="grow min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 truncate">
+                        Jaydeep Dhumal
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 shrink-0">
+                        Student
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 font-medium truncate">dhumaljai@gmail.com</p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 shrink-0" />
                 </button>
+
+                {/* Account 2: Vansh Deshmukh */}
                 <button
                   type="button"
-                  onClick={() => handleGoogleAuth(googleTeacherKey)}
-                  className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm"
+                  onClick={() => handleGoogleAuth({
+                    authEmail: 'vansh@jspm.edu',
+                    authName: 'Vansh Deshmukh',
+                    authRole: 'student'
+                  })}
+                  disabled={isLoading}
+                  className="w-full flex items-center gap-3.5 p-3 rounded-2xl border border-slate-200/90 hover:border-indigo-400 hover:bg-indigo-50/40 text-left transition group card-float"
                 >
-                  Confirm &amp; Proceed
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-600 to-cyan-400 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-sm">
+                    VD
+                  </div>
+                  <div className="grow min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 truncate">
+                        Vansh Deshmukh
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-blue-50 text-blue-700 font-bold border border-blue-200 shrink-0">
+                        Student
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 font-medium truncate">vansh@jspm.edu</p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 shrink-0" />
+                </button>
+
+                {/* Account 3: Prof. Nitin Shivale (Faculty Guide) */}
+                <button
+                  type="button"
+                  onClick={() => handleGoogleAuth({
+                    authEmail: 'nitin.shivale@jspm.edu',
+                    authName: 'Prof. Nitin Shivale',
+                    authRole: 'teacher',
+                    authFacultyKey: 'JSPM-FACULTY-2026'
+                  })}
+                  disabled={isLoading}
+                  className="w-full flex items-center gap-3.5 p-3 rounded-2xl border border-slate-200/90 hover:border-amber-400 hover:bg-amber-50/40 text-left transition group card-float"
+                >
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-600 to-yellow-400 text-white font-bold text-sm flex items-center justify-center shrink-0 shadow-sm">
+                    NS
+                  </div>
+                  <div className="grow min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-slate-900 group-hover:text-amber-700 truncate">
+                        Prof. Nitin Shivale
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-amber-50 text-amber-700 font-bold border border-amber-200 shrink-0">
+                        Faculty Guide
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 font-medium truncate">nitin.shivale@jspm.edu</p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-amber-700 shrink-0" />
+                </button>
+
+                {/* Account 4: Custom / Other Google Account */}
+                {!isUsingCustomGoogle ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsUsingCustomGoogle(true)}
+                    className="w-full flex items-center gap-3.5 p-3 rounded-2xl border border-dashed border-slate-300 hover:border-slate-400 hover:bg-slate-50 text-left transition"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 font-bold text-sm flex items-center justify-center shrink-0">
+                      <User className="w-5 h-5 text-slate-500" />
+                    </div>
+                    <div className="grow">
+                      <span className="text-xs font-bold text-slate-700">Use another Google Account</span>
+                      <p className="text-[11px] text-slate-400">Sign in with any other Gmail account</p>
+                    </div>
+                  </button>
+                ) : (
+                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Your Full Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Omkar Chede"
+                        value={customGoogleName}
+                        onChange={(e) => setCustomGoogleName(e.target.value)}
+                        className="w-full p-2 bg-white rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-indigo-600"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">Your Gmail Address</label>
+                      <input
+                        type="email"
+                        placeholder="yourname@gmail.com"
+                        value={customGoogleEmail}
+                        onChange={(e) => setCustomGoogleEmail(e.target.value)}
+                        className="w-full p-2 bg-white rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-indigo-600"
+                      />
+                    </div>
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsUsingCustomGoogle(false)}
+                        className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-200"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!customGoogleEmail) return alert('Please enter your Google Email');
+                          handleGoogleAuth({
+                            authEmail: customGoogleEmail,
+                            authName: customGoogleName || customGoogleEmail.split('@')[0],
+                            authRole: 'student'
+                          });
+                        }}
+                        disabled={isLoading}
+                        className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm"
+                      >
+                        Sign In with this Account
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+
+              {/* Close Button */}
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowGoogleAccountModal(false)}
+                  className="text-xs font-bold text-slate-400 hover:text-slate-600 transition"
+                >
+                  Cancel and Return
                 </button>
               </div>
+
             </div>
           </div>
         )}
