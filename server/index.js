@@ -13,7 +13,7 @@ import { db } from './db.js';
 import { authenticate, authorize, optionalAuth, generateToken } from './middleware/auth.js';
 import { runTier1Check, compareCode } from './plagiarism/winnowing.js';
 import { tokenizeCode } from './plagiarism/tokenizer.js';
-import { runTier2Evaluation, generateCodeQuiz } from './services/gemini.js';
+import { runTier2Evaluation, generateCodeQuiz, generateAssignmentTestcases } from './services/gemini.js';
 import { generateSubmissionReceipt } from './services/github.js';
 import nodemailer from 'nodemailer';
 
@@ -335,12 +335,15 @@ app.post('/api/auth/send-otp', async (req, res) => {
     console.log(`\n🔐 [SECURE OTP LOG] Dispatch for ${cleanEmail}:`);
     console.log(`   📧 Email OTP: ${emailOtp} (Gmail delivered: ${mailSent})\n`);
 
+    if (!mailSent) {
+      return res.status(500).json({
+        error: `Could not send verification email to ${cleanEmail}. Please verify the email address is valid and active.`
+      });
+    }
+
     res.json({
       success: true,
-      message: mailSent 
-        ? `Verification OTP has been sent to your Gmail inbox (${cleanEmail})!` 
-        : `Verification code generated for ${cleanEmail}!`,
-      otpHint: emailOtp,
+      message: `A 6-digit verification code has been dispatched to your Gmail (${cleanEmail}). Please check your inbox or spam folder.`,
       expiresInSeconds: 600
     });
   } catch (err) {
@@ -644,9 +647,13 @@ async function executeCodeInternal({ language = 'python', code = '', stdin = '' 
         });
       }
 
-      if (stdin) {
-        child.stdin.write(stdin);
-        child.stdin.end();
+      if (child.stdin) {
+        try {
+          if (stdin) {
+            child.stdin.write(stdin);
+          }
+          child.stdin.end();
+        } catch (e) {}
       }
 
       child.stdout.on('data', (d) => { stdout += d.toString(); });
@@ -701,8 +708,43 @@ async function executeCodeInternal({ language = 'python', code = '', stdin = '' 
 }
 
 // Functional correctness and output verification helper
-async function validateFunctionalCorrectness({ code, language, assignment }) {
-  const execResult = await executeCodeInternal({ language, code });
+async function validateFunctionalCorrectness({ code, language, assignment, stdin = '' }) {
+  // If assignment has testcases configured (LeetCode style)
+  if (assignment && Array.isArray(assignment.testcases) && assignment.testcases.length > 0) {
+    for (let i = 0; i < assignment.testcases.length; i++) {
+      const tc = assignment.testcases[i];
+      const tcInput = tc.input != null ? String(tc.input) : '';
+      const tcExpected = (tc.expectedOutput != null ? String(tc.expectedOutput) : '').trim().toLowerCase();
+
+      const tcExec = await executeCodeInternal({ language, code, stdin: tcInput });
+      if (tcExec.status === 'Compile Error' || tcExec.status === 'Runtime Error') {
+        return {
+          passed: false,
+          reason: `Execution failed on Test Case ${i + 1} (${tcExec.status}): ${tcExec.stderr || tcExec.stdout || 'Program halted'}`,
+          stdout: tcExec.stdout,
+          stderr: tcExec.stderr,
+          status: tcExec.status
+        };
+      }
+
+      if (tcExpected) {
+        const actualTcOut = (tcExec.stdout || '').toLowerCase();
+        if (!actualTcOut.includes(tcExpected)) {
+          return {
+            passed: false,
+            reason: `Test Case ${i + 1} Failed: Expected output to contain "${tc.expectedOutput}", but received "${tcExec.stdout.trim() || '(no output)'}"`,
+            stdout: tcExec.stdout,
+            stderr: tcExec.stderr,
+            expected: tc.expectedOutput,
+            status: 'Wrong Output'
+          };
+        }
+      }
+    }
+  }
+
+  // Run with custom stdin or default
+  const execResult = await executeCodeInternal({ language, code, stdin });
   
   if (execResult.status === 'Compile Error' || execResult.status === 'Runtime Error') {
     return {
@@ -1171,7 +1213,7 @@ app.get('/api/assignments/:id', optionalAuth, (req, res) => {
 // Create assignment (Teacher/Admin only)
 app.post('/api/assignments', authenticate, authorize('teacher', 'admin'), (req, res) => {
   try {
-    const { title, subject, code, deadline, languages, minQuizScore, description, starterCode } = req.body;
+    const { title, subject, code, deadline, languages, minQuizScore, description, starterCode, testcases, expectedOutput } = req.body;
     if (!title || !description) {
       return res.status(400).json({ error: 'Title and description are required' });
     }
@@ -1185,6 +1227,8 @@ app.post('/api/assignments', authenticate, authorize('teacher', 'admin'), (req, 
       languages: Array.isArray(languages) && languages.length > 0 ? languages : ['python'],
       minQuizScore: Number(minQuizScore) || 70,
       description,
+      testcases: Array.isArray(testcases) ? testcases : [],
+      expectedOutput: expectedOutput || '',
       starterCode: starterCode || { python: '# Write your solution here\n' },
       teacherId: req.user.role === 'teacher' ? req.user.id : (req.body.teacherId || null)
     };
@@ -1193,6 +1237,19 @@ app.post('/api/assignments', authenticate, authorize('teacher', 'admin'), (req, 
     res.status(201).json(newAsg);
   } catch (err) {
     res.status(500).json({ error: 'Failed to create assignment: ' + err.message });
+  }
+});
+
+// AI Generate Testcases (LeetCode style)
+app.post('/api/assignments/generate-testcases', authenticate, async (req, res) => {
+  try {
+    const { title = '', description = '', language = 'cpp' } = req.body;
+    const settings = db.getSettings();
+    const apiKey = settings.geminiApiKey || process.env.GEMINI_API_KEY;
+    const testcases = await generateAssignmentTestcases({ title, description, language, apiKey });
+    res.json({ testcases });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to generate test cases: ' + err.message });
   }
 });
 
@@ -1249,7 +1306,7 @@ app.post('/api/upload', upload.single('codeFile'), (req, res) => {
 // Tier-1 Plagiarism & Functional Output Check
 app.post('/api/validate/tier1', authenticate, async (req, res) => {
   try {
-    const { code, assignmentId, language } = req.body;
+    const { code, assignmentId, language, stdin = '' } = req.body;
     const studentId = req.user.role === 'student' ? req.user.id : (req.body.studentId || req.user.id);
 
     if (!code || !code.trim()) {
@@ -1263,7 +1320,8 @@ app.post('/api/validate/tier1', authenticate, async (req, res) => {
     const funcCheck = await validateFunctionalCorrectness({
       code,
       language: resolvedLang,
-      assignment
+      assignment,
+      stdin
     });
 
     const settings = db.getSettings();

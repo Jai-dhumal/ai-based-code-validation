@@ -76,6 +76,11 @@ export default function TeacherPortal({
   const [deadline, setDeadline] = useState('2026-11-15');
   const [minQuiz, setMinQuiz] = useState(70);
   const [desc, setDesc] = useState('');
+  const [testcases, setTestcases] = useState([
+    { input: "4\n6\n", expectedOutput: "even", explanation: "4 is an even number" },
+    { input: "5\n7\n", expectedOutput: "odd", explanation: "5 is an odd number" }
+  ]);
+  const [isGeneratingAiTestcases, setIsGeneratingAiTestcases] = useState(false);
   const [isSubmittingAsg, setIsSubmittingAsg] = useState(false);
 
   // ==========================================
@@ -487,6 +492,36 @@ export default function TeacherPortal({
     setTimeout(() => setCopiedCodeType(null), 2000);
   };
 
+  // AI Auto-Generate Test Cases
+  const handleAiGenerateTestcases = async () => {
+    if (!title || !title.trim()) {
+      alert('Please enter an Assignment Title first.');
+      return;
+    }
+    setIsGeneratingAiTestcases(true);
+    try {
+      const res = await fetch('/api/assignments/generate-testcases', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          title,
+          description: desc,
+          language: 'cpp'
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.testcases) && data.testcases.length > 0) {
+          setTestcases(data.testcases);
+        }
+      }
+    } catch (err) {
+      console.warn('AI testcases generation error:', err);
+    } finally {
+      setIsGeneratingAiTestcases(false);
+    }
+  };
+
   // Handle assignment creation
   const handleCreateAssignment = async (e) => {
     e.preventDefault();
@@ -502,8 +537,15 @@ export default function TeacherPortal({
           deadline: new Date(deadline).toISOString(),
           minQuizScore: Number(minQuiz),
           description: desc,
-          languages: ['python'],
-          starterCode: { python: '# Write your code here\n' }
+          languages: ['python', 'cpp', 'c', 'java', 'javascript'],
+          testcases: testcases || [],
+          starterCode: {
+            python: '# Python Solution\nprint("Hello World")\n',
+            cpp: '// C++ Solution\n#include <iostream>\nusing namespace std;\n\nint main() {\n    return 0;\n}\n',
+            c: '// C Solution\n#include <stdio.h>\n\nint main() {\n    return 0;\n}\n',
+            java: '// Java Solution\npublic class Solution {\n    public static void main(String[] args) {\n    }\n}\n',
+            javascript: '// JavaScript Solution\nconsole.log("Hello World");\n'
+          }
         })
       });
 
@@ -2339,6 +2381,72 @@ export default function TeacherPortal({
                   onChange={(e) => setDesc(e.target.value)}
                   className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white"
                 />
+              </div>
+
+              {/* LeetCode Testcases Configuration & AI Generator */}
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-800 dark:text-slate-200 block text-xs flex items-center gap-1.5">
+                    <span>🧪 Assignment Test Cases ({testcases.length})</span>
+                    <span className="text-[10px] text-slate-500 font-normal">(LeetCode Style Stdin &amp; Output)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAiGenerateTestcases}
+                    disabled={isGeneratingAiTestcases}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] flex items-center gap-1 shadow-xs transition"
+                  >
+                    {isGeneratingAiTestcases ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3 text-amber-300" />}
+                    <span>{isGeneratingAiTestcases ? 'Generating...' : '✨ AI Generate Testcases'}</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                  {testcases.map((tc, idx) => (
+                    <div key={idx} className="p-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-bold text-indigo-600 dark:text-indigo-400">Case {idx + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => setTestcases(prev => prev.filter((_, i) => i !== idx))}
+                          className="text-rose-500 hover:text-rose-700 font-bold text-[10px]"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="Input (stdin)"
+                          value={tc.input}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setTestcases(prev => prev.map((t, i) => i === idx ? { ...t, input: val } : t));
+                          }}
+                          className="p-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-mono text-slate-900 dark:text-white"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Expected Output"
+                          value={tc.expectedOutput}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setTestcases(prev => prev.map((t, i) => i === idx ? { ...t, expectedOutput: val } : t));
+                          }}
+                          className="p-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-mono text-slate-900 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setTestcases(prev => [...prev, { input: '', expectedOutput: '', explanation: '' }])}
+                  className="w-full py-1 text-center text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  + Add Custom Testcase
+                </button>
               </div>
 
               <div className="flex justify-end space-x-2 pt-2">

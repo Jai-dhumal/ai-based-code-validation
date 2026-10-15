@@ -29,10 +29,20 @@ import {
   Terminal
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import Editor from '@monaco-editor/react';
 import QuizModal from '../components/QuizModal.jsx';
 import SubmissionReceiptModal from '../components/SubmissionReceiptModal.jsx';
 import Tier2Modal from '../components/Tier2Modal.jsx';
 import CompilerPanel from '../components/CompilerPanel.jsx';
+
+const getMonacoLanguage = (lang) => {
+  if (lang === 'cpp' || lang === 'c++') return 'cpp';
+  if (lang === 'c') return 'c';
+  if (lang === 'python' || lang === 'py') return 'python';
+  if (lang === 'java') return 'java';
+  if (lang === 'javascript' || lang === 'js') return 'javascript';
+  return 'python';
+};
 
 // Sample codes for quick testing
 const DEMO_PRESETS = {
@@ -241,6 +251,7 @@ export default function StudentPortal({
   const [consoleOutput, setConsoleOutput] = useState(null);
   const [isRunningCode, setIsRunningCode] = useState(false);
   const [stdinInput, setStdinInput] = useState('');
+  const [consoleTab, setConsoleTab] = useState('testcases'); // 'testcases' | 'stdin' | 'output'
 
   // Debounced Live Code Authenticity Detection as student writes code
   useEffect(() => {
@@ -443,7 +454,7 @@ export default function StudentPortal({
   );
   const hasSubmittedCurrentAssignment = Boolean(currentSubmission);
   // RUN & COMPILE CODE (Instant Execution)
-  const handleRunCode = async () => {
+  const handleRunCode = async (customStdin = null) => {
     if (!code || !code.trim()) {
       alert('Please enter code before running.');
       return;
@@ -451,7 +462,10 @@ export default function StudentPortal({
 
     setIsRunningCode(true);
     setShowConsole(true);
+    setConsoleTab('output');
     setConsoleOutput(null);
+
+    const inputToUse = customStdin !== null ? customStdin : (stdinInput || '');
 
     try {
       const res = await fetch('/api/compile', {
@@ -460,7 +474,7 @@ export default function StudentPortal({
         body: JSON.stringify({
           language: selectedLanguage,
           code,
-          stdin: stdinInput || ''
+          stdin: inputToUse
         })
       });
 
@@ -499,7 +513,8 @@ export default function StudentPortal({
           code,
           assignmentId: selectedAssignment.id,
           studentId: currentUser?.id,
-          language: selectedLanguage
+          language: selectedLanguage,
+          stdin: stdinInput || ''
         })
       });
 
@@ -1008,6 +1023,49 @@ export default function StudentPortal({
             </span>
           </div>
         </div>
+
+        {/* LeetCode Style Problem Examples Banner */}
+        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-2 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+            <span>Example Specifications &amp; Expected Outputs (LeetCode Style):</span>
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {(selectedAssignment?.testcases?.length > 0 
+              ? selectedAssignment.testcases 
+              : (selectedAssignment?.title?.toLowerCase().includes('even') || selectedAssignment?.description?.toLowerCase().includes('even'))
+                ? [
+                    { input: "4\n6\n", expectedOutput: "The first number is even", explanation: "First number 4 is divisible by 2" },
+                    { input: "5\n7\n", expectedOutput: "The first number is odd", explanation: "First number 5 is odd" }
+                  ]
+                : (selectedAssignment?.title?.toLowerCase().includes('print') || selectedAssignment?.description?.toLowerCase().includes('print'))
+                ? [
+                    { input: "(none)", expectedOutput: "Jay Ganesh", explanation: "Outputs required phrase to stdout" }
+                  ]
+                : [
+                    { input: "10\n", expectedOutput: "10", explanation: "Sample input 1" },
+                    { input: "20\n", expectedOutput: "20", explanation: "Sample input 2" }
+                  ]
+            ).map((tc, idx) => (
+              <div key={idx} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-xs font-mono">
+                <span className="font-bold text-indigo-600 dark:text-indigo-400">Example {idx + 1}:</span>
+                <div className="text-[11px] text-slate-700 dark:text-slate-300 mt-1">
+                  <span className="text-slate-500 font-sans font-medium">Input (stdin): </span>
+                  <code className="text-emerald-600 dark:text-emerald-400 font-bold">{tc.input ? JSON.stringify(tc.input).slice(1, -1) : '(None)'}</code>
+                </div>
+                <div className="text-[11px] text-slate-700 dark:text-slate-300 mt-0.5">
+                  <span className="text-slate-500 font-sans font-medium">Expected Output: </span>
+                  <code className="text-indigo-600 dark:text-indigo-400 font-bold">{tc.expectedOutput}</code>
+                </div>
+                {tc.explanation && (
+                  <div className="text-[10px] text-slate-500 font-sans italic mt-1">
+                    {tc.explanation}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* ========================================================================= */}
@@ -1156,54 +1214,210 @@ export default function StudentPortal({
             </div>
           )}
 
-          <textarea
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            rows={isFullscreen ? 24 : 14}
-            placeholder="Write or paste your code here... (Click 'Run & Compile Code' to test execution)"
-            spellCheck="false"
-            className={`w-full p-4 bg-slate-900 text-emerald-400 font-['Fira_Code',monospace] text-xs rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 leading-relaxed shadow-inner ${isFullscreen ? 'grow resize-none mb-3' : 'resize-y min-h-[220px]'}`}
-          />
+          {/* Microsoft VS Code Monaco Editor */}
+          <div className="rounded-2xl overflow-hidden border border-slate-700/80 shadow-md bg-[#1e1e1e]">
+            <div className="flex items-center justify-between px-4 py-2 bg-[#252526] border-b border-[#333333] text-xs text-slate-400">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
+                <span className="ml-2 font-mono text-[11px] text-slate-300 font-semibold">
+                  solution.{selectedLanguage === 'cpp' ? 'cpp' : selectedLanguage === 'c' ? 'c' : selectedLanguage === 'java' ? 'java' : selectedLanguage === 'javascript' ? 'js' : 'py'}
+                </span>
+              </div>
+              <div className="flex items-center gap-3 text-[11px]">
+                <span className="font-mono text-slate-400">VS Code Monaco Engine</span>
+                <span className="px-1.5 py-0.5 rounded bg-[#333333] text-indigo-300 font-mono text-[10px]">
+                  UTF-8
+                </span>
+              </div>
+            </div>
 
-          {/* Collapsible Console Drawer inside Editor */}
+            <Editor
+              height={isFullscreen ? 'calc(100vh - 340px)' : '380px'}
+              language={getMonacoLanguage(selectedLanguage)}
+              theme="vs-dark"
+              value={code}
+              onChange={(val) => setCode(val || '')}
+              options={{
+                minimap: { enabled: false },
+                fontSize: 13,
+                fontFamily: "'Fira Code', 'Consolas', 'Courier New', monospace",
+                lineNumbers: 'on',
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                tabSize: 4,
+                bracketPairColorization: { enabled: true },
+                suggestOnTriggerCharacters: true,
+                wordWrap: 'on',
+                formatOnPaste: true,
+                padding: { top: 12, bottom: 12 }
+              }}
+            />
+          </div>
+
+          {/* LeetCode-Style Interactive Console Drawer (Testcases, Stdin, Output) */}
           {showConsole && (
             <div className="mt-3 p-4 bg-slate-950 rounded-2xl border border-slate-800 text-xs font-mono">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-slate-400 mb-2">
-                <span className="flex items-center gap-1.5 font-bold text-slate-200">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-slate-400 mb-3">
+                <div className="flex items-center gap-2">
                   <Terminal className="w-3.5 h-3.5 text-indigo-400" />
-                  Compiler Console &amp; Test Output
-                </span>
+                  <div className="flex gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setConsoleTab('testcases')}
+                      className={`px-2.5 py-1 rounded text-[11px] font-bold transition ${consoleTab === 'testcases' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                    >
+                      🧪 Test Cases ({((selectedAssignment?.testcases?.length) || 2)})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConsoleTab('stdin')}
+                      className={`px-2.5 py-1 rounded text-[11px] font-bold transition ${consoleTab === 'stdin' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                    >
+                      ⌨️ Custom Input (stdin)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConsoleTab('output')}
+                      className={`px-2.5 py-1 rounded text-[11px] font-bold transition ${consoleTab === 'output' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                    >
+                      📟 Execution Output {consoleOutput && `(${consoleOutput.status})`}
+                    </button>
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowConsole(false)}
-                  className="text-slate-500 hover:text-slate-300 text-[11px]"
+                  className="text-slate-500 hover:text-slate-300 text-[11px] font-bold"
                 >
                   Close Console ✕
                 </button>
               </div>
 
-              {isRunningCode ? (
-                <div className="text-indigo-400 animate-pulse py-2">Compiling and executing code...</div>
-              ) : consoleOutput ? (
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${consoleOutput.status === 'Accepted' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'}`}>
-                      {consoleOutput.status}
-                    </span>
-                    {consoleOutput.time && <span className="text-[10px] text-slate-500">{consoleOutput.time}s</span>}
+              {/* TAB 1: TEST CASES & EXAMPLES (LeetCode Style) */}
+              {consoleTab === 'testcases' && (
+                <div className="space-y-3">
+                  <p className="text-[11px] text-slate-400">
+                    Run your solution against predefined assignment test cases. Click <strong>"Run with this input"</strong> to pipe values into <code className="text-indigo-300 font-bold">cin &gt;&gt;</code> or <code className="text-indigo-300 font-bold">input()</code>.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {(selectedAssignment?.testcases?.length > 0 
+                      ? selectedAssignment.testcases
+                      : (selectedAssignment?.title?.toLowerCase().includes('even') || selectedAssignment?.description?.toLowerCase().includes('even'))
+                        ? [
+                            { input: "4\n6\n", expectedOutput: "even", explanation: "4 is an even number" },
+                            { input: "5\n7\n", expectedOutput: "odd", explanation: "5 is an odd number" }
+                          ]
+                        : (selectedAssignment?.title?.toLowerCase().includes('print') || selectedAssignment?.description?.toLowerCase().includes('print'))
+                        ? [
+                            { input: "", expectedOutput: "Jay Ganesh", explanation: "Outputs required phrase" }
+                          ]
+                        : [
+                            { input: "10\n", expectedOutput: "10", explanation: "Sample input 1" },
+                            { input: "20\n", expectedOutput: "20", explanation: "Sample input 2" }
+                          ]
+                    ).map((tc, idx) => (
+                      <div key={idx} className="p-3 bg-slate-900/90 rounded-xl border border-slate-800 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-slate-300">Case {idx + 1}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStdinInput(tc.input || '');
+                              handleRunCode(tc.input || '');
+                            }}
+                            className="px-2 py-0.5 rounded bg-emerald-600/20 border border-emerald-500/40 text-emerald-400 text-[10px] font-bold hover:bg-emerald-600/30 transition flex items-center gap-1"
+                          >
+                            <Play className="w-2.5 h-2.5" />
+                            Run Case
+                          </button>
+                        </div>
+                        <div className="text-[11px]">
+                          <span className="text-slate-500">Input: </span>
+                          <span className="text-emerald-300 font-mono">{tc.input ? JSON.stringify(tc.input).slice(1, -1) : '(None)'}</span>
+                        </div>
+                        <div className="text-[11px]">
+                          <span className="text-slate-500">Expected: </span>
+                          <span className="text-indigo-300 font-mono font-bold">{tc.expectedOutput || '(Any)'}</span>
+                        </div>
+                        {tc.explanation && (
+                          <p className="text-[10px] text-slate-400 italic border-t border-slate-800/80 pt-1">
+                            {tc.explanation}
+                          </p>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  {consoleOutput.stdout && (
-                    <pre className="text-emerald-400 whitespace-pre-wrap">{consoleOutput.stdout}</pre>
-                  )}
-                  {consoleOutput.stderr && (
-                    <pre className="text-rose-400 whitespace-pre-wrap">{consoleOutput.stderr}</pre>
-                  )}
-                  {!consoleOutput.stdout && !consoleOutput.stderr && (
-                    <span className="text-slate-500 italic">Program finished with no output.</span>
+                </div>
+              )}
+
+              {/* TAB 2: CUSTOM INPUT (STDIN) */}
+              {consoleTab === 'stdin' && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] text-slate-300 font-bold">
+                      Standard Input (stdin for <code className="text-indigo-300">cin &gt;&gt;</code> / <code className="text-indigo-300">scanf</code> / <code className="text-indigo-300">input()</code>):
+                    </label>
+                    <span className="text-[10px] text-slate-500">Enter multi-line values, one per prompt</span>
+                  </div>
+                  <textarea
+                    rows={4}
+                    value={stdinInput}
+                    onChange={(e) => setStdinInput(e.target.value)}
+                    placeholder={"e.g.\n4\n6"}
+                    className="w-full p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-emerald-300 font-mono text-xs focus:outline-none focus:border-indigo-500 resize-y"
+                  />
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleRunCode()}
+                      disabled={isRunningCode}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition"
+                    >
+                      <Play className="w-3 h-3" />
+                      <span>{isRunningCode ? 'Executing...' : 'Run Code with Stdin'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: EXECUTION OUTPUT */}
+              {consoleTab === 'output' && (
+                <div>
+                  {isRunningCode ? (
+                    <div className="text-indigo-400 animate-pulse py-2 flex items-center gap-2">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Compiling and executing code with stdin...</span>
+                    </div>
+                  ) : consoleOutput ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3">
+                        <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${consoleOutput.status === 'Accepted' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'}`}>
+                          {consoleOutput.status}
+                        </span>
+                        {consoleOutput.time && <span className="text-[10px] text-slate-500">{consoleOutput.time}s</span>}
+                      </div>
+                      {consoleOutput.stdout && (
+                        <div className="p-2.5 bg-slate-900 rounded-xl border border-slate-800">
+                          <span className="text-[10px] text-slate-500 block mb-1">Standard Output (stdout):</span>
+                          <pre className="text-emerald-400 whitespace-pre-wrap">{consoleOutput.stdout}</pre>
+                        </div>
+                      )}
+                      {consoleOutput.stderr && (
+                        <div className="p-2.5 bg-rose-950/40 rounded-xl border border-rose-900/60">
+                          <span className="text-[10px] text-rose-400 block mb-1">Error / Diagnostics (stderr):</span>
+                          <pre className="text-rose-400 whitespace-pre-wrap">{consoleOutput.stderr}</pre>
+                        </div>
+                      )}
+                      {!consoleOutput.stdout && !consoleOutput.stderr && (
+                        <span className="text-slate-500 italic">Program finished cleanly with no output.</span>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-slate-500 italic">Click 'Run &amp; Compile Code' or 'Run Case' to test execution.</span>
                   )}
                 </div>
-              ) : (
-                <span className="text-slate-500 italic">Click 'Run &amp; Compile Code' below to execute solution.</span>
               )}
             </div>
           )}

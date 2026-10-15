@@ -49,8 +49,6 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
   const [successMsg, setSuccessMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // OTP demo fallback helper
-  const [otpHint, setOtpHint] = useState('');
 
   // Fetch departments for registration dropdown
   useEffect(() => {
@@ -153,13 +151,8 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
 
       setOtpStep(true);
       setOtpTimer(600);
-      if (data.otpHint) {
-        setOtpHint(data.otpHint);
-        setEmailOtp(data.otpHint);
-        setSuccessMsg(data.message || `Verification OTP sent to your Gmail inbox (${email})!`);
-      } else {
-        setSuccessMsg(`Verification OTP sent to your Gmail inbox (${email})!`);
-      }
+      setEmailOtp('');
+      setSuccessMsg(data.message || `A verification OTP has been dispatched to your Gmail (${email}). Please check your inbox.`);
     } catch (err) {
       setErrorMsg(err.message);
     } finally {

@@ -677,3 +677,71 @@ function offlineQuizGenerator(code = '', assignmentTitle = '', language = 'pytho
     }
   ];
 }
+
+export async function generateAssignmentTestcases({ title = '', description = '', language = 'cpp', apiKey }) {
+  if (apiKey) {
+    try {
+      const prompt = `You are a computer science professor creating test cases for a programming problem.
+Title: "${title}"
+Description: "${description}"
+Language: ${language}
+
+Generate 2 or 3 standard test cases with input and expected output substring.
+Respond ONLY with a valid JSON array in this exact format:
+[
+  {
+    "input": "4\\n6\\n",
+    "expectedOutput": "The first number is even",
+    "explanation": "4 is an even number"
+  }
+]`;
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            responseMimeType: 'application/json'
+          }
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (rawText) {
+          const parsed = JSON.parse(rawText);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('Gemini testcase generation fallback:', e.message);
+    }
+  }
+
+  // Heuristic Fallback
+  const titleLower = (title + ' ' + description).toLowerCase();
+  if (titleLower.includes('even') || titleLower.includes('odd')) {
+    return [
+      { input: "4\n6\n", expectedOutput: "even", explanation: "4 is even" },
+      { input: "5\n7\n", expectedOutput: "odd", explanation: "5 is odd" }
+    ];
+  } else if (titleLower.includes('jay ganesh')) {
+    return [
+      { input: "", expectedOutput: "Jay Ganesh", explanation: "Prints devotional greeting" }
+    ];
+  } else if (titleLower.includes('sum') || titleLower.includes('add')) {
+    return [
+      { input: "10\n20\n", expectedOutput: "30", explanation: "10 + 20 = 30" },
+      { input: "5\n15\n", expectedOutput: "20", explanation: "5 + 15 = 20" }
+    ];
+  }
+
+  return [
+    { input: "10\n", expectedOutput: "10", explanation: "Sample Testcase 1" },
+    { input: "20\n", expectedOutput: "20", explanation: "Sample Testcase 2" }
+  ];
+}
+
