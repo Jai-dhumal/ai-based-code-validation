@@ -88,7 +88,11 @@ export default function Navbar({
       .toUpperCase()
       .slice(0, 2);
 
-  const roleInfo = getRoleBadge(currentUser?.role);
+  const roleInfo = getRoleBadge(currentUser?.role) || {
+    icon: <GraduationCap className="w-3.5 h-3.5 text-blue-500" />,
+    label: 'Student',
+    style: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800'
+  };
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-xs transition-colors duration-200">

@@ -155,8 +155,21 @@ export default function App() {
     }
   };
 
-  // If not logged in, show login page
-  if (!currentUser) {
+  // Validate user session integrity
+  const isValidUser = Boolean(
+    currentUser &&
+    currentUser.id &&
+    ['student', 'teacher', 'admin'].includes(currentUser.role)
+  );
+
+  // If not logged in or invalid session, show login page
+  if (!isValidUser) {
+    if (currentUser) {
+      try {
+        localStorage.removeItem('ai_validate_user');
+        localStorage.removeItem('ai_validate_token');
+      } catch (e) {}
+    }
     return <LoginPage onLoginSuccess={handleLoginSuccess} isDark={isDark} onToggleTheme={handleToggleTheme} />;
   }
 
@@ -211,10 +224,10 @@ export default function App() {
                 </div>
 
                 <div className="space-y-2">
-                  {assignments.map((asg) => {
+                  {(assignments || []).map((asg) => {
                     const isSelected = selectedAssignment?.id === asg.id;
-                    const studentSub = submissions.find(
-                      s => s.assignmentId === asg.id && s.studentId === currentUser.id
+                    const studentSub = (submissions || []).find(
+                      s => s && s.assignmentId === asg.id && s.studentId === currentUser?.id
                     );
 
                     return (
@@ -252,9 +265,9 @@ export default function App() {
                         <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mt-2">
                           <span className="flex items-center gap-1">
                             <Clock className="w-3 h-3" />
-                            {new Date(asg.deadline).toLocaleDateString()}
+                            {asg.deadline ? new Date(asg.deadline).toLocaleDateString() : 'Active'}
                           </span>
-                          <span className="font-semibold text-slate-600 dark:text-slate-300">Pass: ≥{asg.minQuizScore}%</span>
+                          <span className="font-semibold text-slate-600 dark:text-slate-300">Pass: ≥{asg.minQuizScore || 70}%</span>
                         </div>
                       </button>
                     );
