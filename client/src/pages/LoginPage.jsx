@@ -43,7 +43,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
   // Email OTP Verification state
   const [otpStep, setOtpStep] = useState(false);
   const [emailOtp, setEmailOtp] = useState('');
-  const [otpTimer, setOtpTimer] = useState(600);
+  const [otpTimer, setOtpTimer] = useState(300);
 
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -150,9 +150,9 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
       }
 
       setOtpStep(true);
-      setOtpTimer(600);
+      setOtpTimer(data.expiresInSeconds || 300);
       setEmailOtp('');
-      setSuccessMsg(data.message || `A verification OTP has been dispatched to your Gmail (${email}). Please check your inbox.`);
+      setSuccessMsg(data.message || `A verification OTP has been dispatched to your email (${email}). Please check your inbox.`);
     } catch (err) {
       setErrorMsg(err.message);
     } finally {
@@ -670,11 +670,11 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                 <button
                   type="button"
                   onClick={handleRequestOtp}
-                  disabled={isLoading || otpTimer > 540}
+                  disabled={isLoading || otpTimer > 270}
                   className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline disabled:opacity-50 disabled:no-underline inline-flex items-center gap-1"
                 >
                   <RefreshCw className="w-3 h-3" />
-                  <span>Resend Verification Code</span>
+                  <span>{otpTimer > 270 ? `Resend code in ${otpTimer - 270}s` : 'Resend Verification Code'}</span>
                 </button>
               </div>
             </form>

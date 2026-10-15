@@ -1,3 +1,4 @@
+process.env.NODE_ENV = 'test';
 // E2E HTTP API Testing Suite
 // Tests all endpoints against live HTTP server
 import http from 'http';

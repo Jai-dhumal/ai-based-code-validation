@@ -226,7 +226,7 @@ function generateOtp() {
 // Nodemailer SMTP Transporter: supports standard SMTP_* and backward-compatible GMAIL_*
 let cachedTransporter = null;
 
-function getMailTransporter() {
+export function getMailTransporter() {
   if (process.env.NODE_ENV === 'test') {
     return nodemailer.createTransport({ jsonTransport: true });
   }
@@ -259,19 +259,38 @@ function getMailTransporter() {
   return null;
 }
 
-async function sendRealEmailOtp(toEmail, otpCode, role) {
+// Safely verify SMTP connection readiness without exposing secrets
+export async function verifySmtpConnection() {
   const transporter = getMailTransporter();
   if (!transporter) {
+    return { configured: false, ready: false, message: 'SMTP credentials not configured in environment variables.' };
+  }
+  try {
+    await transporter.verify();
+    return { configured: true, ready: true, message: 'SMTP server connection successfully verified.' };
+  } catch (err) {
+    return { configured: true, ready: false, message: err.message };
+  }
+}
+
+export async function sendRealEmailOtp(toEmail, otpCode, role, customTransporter = null) {
+  const transporter = customTransporter || getMailTransporter();
+  if (!transporter) {
     console.warn(`⚠️ [MAIL WARNING] SMTP credentials not configured. Unable to send verification email to ${toEmail}`);
-    return false;
+    return {
+      success: false,
+      statusCode: 503,
+      errorCode: 'SMTP_NOT_CONFIGURED',
+      error: 'Mail service is not configured. Server administrator must supply valid SMTP credentials in environment variables.'
+    };
   }
 
   const senderUser = process.env.SMTP_USER || process.env.GMAIL_USER;
   const fromAddress = process.env.SMTP_FROM || (senderUser ? `"JSPM BSIOTR AI Code Validator" <${senderUser}>` : '"JSPM BSIOTR AI Code Validator" <noreply@jspm.edu>');
 
   const welcomeRoleText = role === 'teacher'
-    ? 'Faculty registered successfully! Welcome to the Code Validation System.'
-    : 'Student registered successfully! Welcome to the Code Validation System.';
+    ? 'Faculty registration requested. Welcome to the Code Validation System.'
+    : 'Student registration requested. Welcome to the Code Validation System.';
 
   const mailOptions = {
     from: fromAddress,
@@ -299,7 +318,7 @@ async function sendRealEmailOtp(toEmail, otpCode, role) {
             ${otpCode}
           </div>
           <p style="color: #dc2626; font-size: 12px; font-weight: 600; margin: 12px 0 0 0;">
-            ⏱ Valid for 10 minutes. Please do not share this code.
+            ⏱ Valid for 5 minutes. Please do not share this code.
           </p>
         </div>
 
@@ -319,11 +338,51 @@ async function sendRealEmailOtp(toEmail, otpCode, role) {
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log(`📧 [EMAIL SENT] Verification email successfully dispatched to ${toEmail}`);
-    return true;
+    console.log(`📧 [EMAIL SENT] Verification email accepted by SMTP server for ${toEmail} (Message ID: ${info.messageId})`);
+    return {
+      success: true,
+      info
+    };
   } catch (err) {
     console.error(`❌ [MAIL ERROR] Failed to send email to ${toEmail}:`, err.message);
-    return false;
+
+    const msg = (err.message || '').toLowerCase();
+    const code = err.code || '';
+    const responseCode = err.responseCode || 0;
+
+    if (code === 'EAUTH' || responseCode === 535 || msg.includes('invalid login') || msg.includes('username and password not accepted')) {
+      return {
+        success: false,
+        statusCode: 503,
+        errorCode: 'SMTP_AUTH_FAILED',
+        error: 'Mail service authentication failed. The configured Gmail App Password was rejected by Google.'
+      };
+    }
+
+    if (code === 'ETIMEDOUT' || code === 'ESOCKETTIMEDOUT' || code === 'ECONNECTION' || msg.includes('timed out') || code === 'ENOTFOUND') {
+      return {
+        success: false,
+        statusCode: 504,
+        errorCode: 'SMTP_TIMEOUT',
+        error: 'Mail server connection timed out while reaching smtp.gmail.com. Please check server network connectivity.'
+      };
+    }
+
+    if (responseCode >= 500 && responseCode < 600 || msg.includes('recipient') || err.rejected?.length) {
+      return {
+        success: false,
+        statusCode: 400,
+        errorCode: 'RECIPIENT_REJECTED',
+        error: `The mail provider rejected delivery to ${toEmail}. Please verify the email address is spelled correctly.`
+      };
+    }
+
+    return {
+      success: false,
+      statusCode: 500,
+      errorCode: 'SMTP_SEND_FAILED',
+      error: `Failed to dispatch verification email: ${err.message}`
+    };
   }
 }
 
@@ -337,9 +396,10 @@ app.post('/api/auth/send-otp', async (req, res) => {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // Comprehensive RFC 5322 regex supporting personal (.com) and institutional (.edu, .edu.in, .ac.in, subdomains)
+    const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
     if (!EMAIL_REGEX.test(cleanEmail)) {
-      return res.status(400).json({ error: 'Please enter a valid email address.' });
+      return res.status(400).json({ error: 'Please enter a valid email address (e.g. name@gmail.com or name@jspm.edu).' });
     }
 
     // Role check
@@ -375,26 +435,32 @@ app.post('/api/auth/send-otp', async (req, res) => {
     }
 
     const emailOtp = generateOtp();
-    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+    const OTP_TTL_SECONDS = 300; // 5 minutes
+    const expiresAt = Date.now() + OTP_TTL_SECONDS * 1000;
 
     // Attempt real email dispatch with timeout race (15s allows for initial SSL handshake)
-    let mailSent = false;
+    let dispatchResult = null;
     try {
-      mailSent = await Promise.race([
+      dispatchResult = await Promise.race([
         sendRealEmailOtp(cleanEmail, emailOtp, role),
         new Promise((_, reject) => setTimeout(() => reject(new Error('SMTP connection timed out')), 15000))
       ]);
     } catch (e) {
       console.warn(`⚠️ [MAIL DISPATCH NOTICE] ${cleanEmail}: ${e.message}`);
-      mailSent = false;
+      dispatchResult = {
+        success: false,
+        statusCode: 504,
+        errorCode: 'SMTP_TIMEOUT',
+        error: 'Mail server connection timed out while reaching smtp.gmail.com. Please try again in a few moments.'
+      };
     }
 
     // Strict security check: If email delivery failed, never return success and do NOT store usable OTP
-    if (!mailSent) {
+    if (!dispatchResult || !dispatchResult.success) {
       otpStore.delete(cleanEmail);
-      return res.status(503).json({
-        error: 'Unable to deliver verification email at this moment. Please check your network connection or verify that mail server settings are configured.'
-      });
+      const status = dispatchResult?.statusCode || 503;
+      const error = dispatchResult?.error || 'Unable to deliver verification email at this moment. Please check your network connection or verify that mail server settings are configured.';
+      return res.status(status).json({ error });
     }
 
     // Record valid OTP session
@@ -413,7 +479,7 @@ app.post('/api/auth/send-otp', async (req, res) => {
       success: true,
       mailDelivered: true,
       message: `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your inbox or spam folder.`,
-      expiresInSeconds: 600
+      expiresInSeconds: OTP_TTL_SECONDS
     });
   } catch (err) {
     console.error('Send OTP error:', err);
@@ -2570,7 +2636,10 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message || 'Internal Server Error' });
 });
 
-// Start Server
-app.listen(PORT, () => {
-  console.log(`🚀 Assignment Validation 2.0 API server running on http://localhost:${PORT}`);
-});
+// Start Server only when executed directly (not when imported for testing)
+const isMainModule = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename);
+if (isMainModule) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Assignment Validation 2.0 API server running on http://localhost:${PORT}`);
+  });
+}
