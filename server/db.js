@@ -1,6 +1,28 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import dns from 'dns';
+
+// Ensure Windows resolves MongoDB Atlas SRV records properly
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+} catch (e) {}
+
+import mongoose from 'mongoose';
+import {
+  User,
+  Department,
+  Subject,
+  Assignment,
+  Submission,
+  QuizPermission,
+  VivaSubmission,
+  QuizAccessRequest,
+  Announcement,
+  Notification,
+  ActivityLog,
+  Setting
+} from './models/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,25 +80,25 @@ const defaultData = {
     {
       id: 'usr_teacher_1',
       name: 'Prof. Nitin Shivale',
-      email: 'nitin.shivale@jspm.edu',
+      email: 'nitin@jspm.edu',
       password: DEFAULT_HASHED_PASS,
       role: 'teacher',
       department: 'Computer Engineering',
-      title: 'Assistant Professor & Guide',
       divisions: ['A'],
+      title: 'Assistant Professor',
       lastHeartbeat: null,
       isOnline: false,
       createdAt: '2026-09-01T00:00:00Z'
     },
     {
       id: 'usr_teacher_2',
-      name: 'Prof. Anjali Mehta',
-      email: 'anjali.mehta@jspm.edu',
+      name: 'Prof. Supriya Kharde',
+      email: 'supriya@jspm.edu',
       password: DEFAULT_HASHED_PASS,
       role: 'teacher',
-      department: 'Computer Engineering',
-      title: 'Associate Professor',
+      department: 'Information Technology',
       divisions: ['A'],
+      title: 'Associate Professor',
       lastHeartbeat: null,
       isOnline: false,
       createdAt: '2026-09-01T00:00:00Z'
@@ -88,64 +110,10 @@ const defaultData = {
       password: DEFAULT_HASHED_PASS,
       role: 'admin',
       department: 'Computer Engineering',
-      title: 'Head of Department & Administrator',
+      title: 'Head of Department',
       lastHeartbeat: null,
       isOnline: false,
       createdAt: '2026-09-01T00:00:00Z'
-    }
-  ],
-  assignments: [
-    {
-      id: 'asg_1',
-      title: 'Binary Search Tree Operations',
-      subject: 'Data Structures & Algorithms',
-      code: 'CS301',
-      deadline: '2026-10-15T23:59:59Z',
-      languages: ['python', 'cpp', 'java'],
-      minQuizScore: 70,
-      teacherId: 'usr_teacher_1',
-      description: 'Implement a Binary Search Tree (BST) supporting insert(val), search(val), and in_order_traversal(). Optimize for clean recursion and edge handling (empty tree, duplicates).',
-      starterCode: {
-        python: `class TreeNode:\n    def __init__(self, val=0):\n        self.val = val\n        self.left = None\n        self.right = None\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n\n    def insert(self, val):\n        # TODO: Implement insert\n        pass\n\n    def search(self, val):\n        # TODO: Implement search\n        return False\n\n    def in_order(self):\n        # TODO: Return list of values\n        return []\n`,
-        cpp: `#include <iostream>\n#include <vector>\n\nstruct TreeNode {\n    int val;\n    TreeNode* left;\n    TreeNode* right;\n    TreeNode(int v) : val(v), left(nullptr), right(nullptr) {}\n};\n\nclass BinarySearchTree {\npublic:\n    TreeNode* root = nullptr;\n    void insert(int val);\n    bool search(int val);\n    std::vector<int> inOrder();\n};\n`
-      }
-    },
-    {
-      id: 'asg_2',
-      title: 'Dijkstra Shortest Path Algorithm',
-      subject: 'Advanced Algorithms',
-      code: 'CS402',
-      deadline: '2026-10-25T23:59:59Z',
-      languages: ['python', 'cpp'],
-      minQuizScore: 75,
-      teacherId: 'usr_teacher_1',
-      description: 'Implement Dijkstra\'s Single Source Shortest Path on a weighted directed graph using a Min-Heap / Priority Queue. Handle disconnected graphs gracefully.',
-      starterCode: {
-        python: `import heapq\n\ndef dijkstra(graph, start_node):\n    # graph is {u: [(v, weight), ...]}\n    # TODO: return shortest distances dict from start_node\n    distances = {start_node: 0}\n    return distances\n`
-      }
-    }
-  ],
-  submissions: [
-    {
-      id: 'sub_omkar_bst',
-      assignmentId: 'asg_1',
-      studentId: 'usr_student_3',
-      studentName: 'Omkar Chede',
-      rollNo: 'CE2025-03',
-      department: 'Computer Engineering',
-      division: 'A',
-      language: 'python',
-      submittedAt: '2026-09-18T14:30:00Z',
-      code: `class TreeNode:\n    def __init__(self, val=0, left=None, right=None):\n        self.val = val\n        self.left = left\n        self.right = right\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n\n    def insert(self, val):\n        if not self.root:\n            self.root = TreeNode(val)\n            return\n        curr = self.root\n        while True:\n            if val < curr.val:\n                if not curr.left:\n                    curr.left = TreeNode(val)\n                    break\n                curr = curr.left\n            elif val > curr.val:\n                if not curr.right:\n                    curr.right = TreeNode(val)\n                    break\n                curr = curr.right\n            else:\n                break\n\n    def search(self, val):\n        curr = self.root\n        while curr:\n            if curr.val == val:\n                return True\n            elif val < curr.val:\n                curr = curr.left\n            else:\n                curr = curr.right\n        return False\n\n    def in_order(self):\n        res = []\n        def traverse(node):\n            if not node: return\n            traverse(node.left)\n            res.append(node.val)\n            traverse(node.right)\n        traverse(self.root)\n        return res\n`,
-      tier1Score: 12,
-      tier1Verdict: 'Low Similarity (Unique)',
-      tier2Score: 8,
-      tier2Verdict: 'Original Independent Work',
-      quizScore: 92,
-      quizPassed: true,
-      githubStatus: 'Committed & Pushed',
-      githubCommitSha: 'a8b79e2c451d67',
-      status: 'Approved'
     }
   ],
   departments: [
@@ -155,28 +123,83 @@ const defaultData = {
     { id: 'dept_4', name: 'Mechanical Engineering', code: 'ME', divisions: ['A', 'B', 'C'] },
     { id: 'dept_5', name: 'Civil Engineering', code: 'CIVIL', divisions: ['A', 'B', 'C'] }
   ],
+  assignments: [
+    {
+      id: 'asg_1',
+      title: 'Assignment 1: Binary Search Tree Implementation',
+      subject: 'Data Structures & Algorithms',
+      code: 'CS201',
+      deadline: '2026-10-30',
+      languages: ['cpp', 'java', 'python'],
+      minQuizScore: 70,
+      teacherId: 'usr_teacher_1',
+      description: 'Implement a BST with insert, delete, search, and in-order traversal operations.',
+      starterCode: {
+        python: 'class TreeNode:\n    def __init__(self, val=0):\n        self.val = val\n        self.left = None\n        self.right = None\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n\n    def insert(self, val):\n        # TODO: Implement insert\n        pass\n\n    def search(self, val):\n        # TODO: Implement search\n        return False\n\n    def in_order(self):\n        # TODO: Return list of values\n        return []\n',
+        cpp: '#include <iostream>\n#include <vector>\n\nstruct TreeNode {\n    int val;\n    TreeNode* left;\n    TreeNode* right;\n    TreeNode(int v) : val(v), left(nullptr), right(nullptr) {}\n};\n\nclass BinarySearchTree {\npublic:\n    TreeNode* root = nullptr;\n    void insert(int val);\n    bool search(int val);\n    std::vector<int> inOrder();\n};\n'
+      }
+    },
+    {
+      id: 'asg_2',
+      title: 'Assignment 2: Dijkstra Shortest Path Algorithm',
+      subject: 'Design & Analysis of Algorithms',
+      code: 'CS301',
+      deadline: '2026-11-15',
+      languages: ['cpp', 'java', 'python'],
+      minQuizScore: 70,
+      teacherId: 'usr_teacher_1',
+      description: 'Implement Dijkstra algorithm using adjacency list and priority queue (min-heap).',
+      starterCode: {
+        python: 'import heapq\n\ndef dijkstra(graph, start):\n    # TODO: Implement Dijkstra\n    # graph is dict: {node: [(neighbor, weight), ...]}\n    return {}\n',
+        cpp: '#include <iostream>\n#include <vector>\n#include <queue>\n\n// TODO: Implement Dijkstra using priority_queue\n'
+      }
+    }
+  ],
+  submissions: [
+    {
+      id: 'sub_sample_1',
+      assignmentId: 'asg_1',
+      studentId: 'usr_student_1',
+      studentName: 'Vansh Deshmukh',
+      rollNo: 'CE2025-01',
+      language: 'cpp',
+      submittedAt: '2026-10-10T14:32:00Z',
+      code: '#include <iostream>\nusing namespace std;\n\nstruct Node {\n    int data;\n    Node *left, *right;\n    Node(int v) : data(v), left(nullptr), right(nullptr) {}\n};\n\nNode* insert(Node* root, int val) {\n    if (!root) return new Node(val);\n    if (val < root->data) root->left = insert(root->left, val);\n    else root->right = insert(root->right, val);\n    return root;\n}\n\nvoid inorder(Node* root) {\n    if (!root) return;\n    inorder(root->left);\n    cout << root->data << " ";\n    inorder(root->right);\n}\n\nint main() {\n    Node* root = nullptr;\n    root = insert(root, 50);\n    insert(root, 30);\n    insert(root, 70);\n    inorder(root);\n    return 0;\n}',
+      tier1Score: 12,
+      tier1Verdict: 'clean',
+      tier2Score: 88,
+      tier2Verdict: 'authentic',
+      quizScore: 85,
+      quizPassed: true,
+      githubStatus: 'committed',
+      githubCommitSha: 'a1b2c3d4e5f6',
+      status: 'completed',
+      department: 'Computer Engineering',
+      division: 'A'
+    }
+  ],
   quizPermissions: [],
   vivaSubmissions: [],
   settings: {
     geminiApiKey: process.env.GEMINI_API_KEY || '',
-    tier1ThresholdLow: 35,
-    tier1ThresholdHigh: 75,
+    tier1ThresholdLow: 30,
+    tier1ThresholdHigh: 60,
     defaultMinQuizScore: 70
   },
   subjects: [
     {
-      id: 'subj_1',
+      id: 'sub_1',
       name: 'Data Structures & Algorithms',
-      code: 'CS301',
-      semester: 5,
+      code: 'CS201',
+      semester: 3,
       teacherId: 'usr_teacher_1',
       department: 'Computer Engineering'
     },
     {
-      id: 'subj_2',
-      name: 'Advanced Algorithms',
-      code: 'CS402',
-      semester: 7,
+      id: 'sub_2',
+      name: 'Design & Analysis of Algorithms',
+      code: 'CS301',
+      semester: 5,
       teacherId: 'usr_teacher_1',
       department: 'Computer Engineering'
     }
@@ -201,7 +224,9 @@ const defaultData = {
 
 class Database {
   constructor() {
+    this.mongoConnected = false;
     this.init();
+    this.initMongo();
   }
 
   init() {
@@ -273,6 +298,69 @@ class Database {
     }
   }
 
+  async initMongo() {
+    const uri = process.env.MONGODB_URI;
+    if (!uri) return;
+    try {
+      if (mongoose.connection.readyState === 0) {
+        await mongoose.connect(uri, { serverSelectionTimeoutMS: 10000 });
+        console.log('🍃 [MONGODB ATLAS] Connected to cluster0.bbwixkk.mongodb.net/code_validator');
+      }
+      this.mongoConnected = true;
+
+      // Load collections from MongoDB Atlas into memory cache
+      const [users, assignments, submissions, depts, subs, perms, vivas, reqs, anns, notifs, logs] = await Promise.all([
+        User.find({}).lean(),
+        Assignment.find({}).lean(),
+        Submission.find({}).lean(),
+        Department.find({}).lean(),
+        Subject.find({}).lean(),
+        QuizPermission.find({}).lean(),
+        VivaSubmission.find({}).lean(),
+        QuizAccessRequest.find({}).lean(),
+        Announcement.find({}).lean(),
+        Notification.find({}).lean(),
+        ActivityLog.find({}).lean()
+      ]);
+
+      if (users && users.length > 0) this.data.users = users;
+      if (assignments && assignments.length > 0) this.data.assignments = assignments;
+      if (submissions && submissions.length > 0) this.data.submissions = submissions;
+      if (depts && depts.length > 0) this.data.departments = depts;
+      if (subs && subs.length > 0) this.data.subjects = subs;
+      if (perms && perms.length > 0) this.data.quizPermissions = perms;
+      if (vivas && vivas.length > 0) this.data.vivaSubmissions = vivas;
+      if (reqs && reqs.length > 0) this.data.quizAccessRequests = reqs;
+      if (anns && anns.length > 0) this.data.announcements = anns;
+      if (notifs && notifs.length > 0) this.data.notifications = notifs;
+      if (logs && logs.length > 0) this.data.activityLogs = logs;
+      
+      const settingDoc = await Setting.findOne({ key: 'global_settings' }).lean();
+      if (settingDoc) {
+        delete settingDoc._id;
+        delete settingDoc.key;
+        this.data.settings = { ...this.data.settings, ...settingDoc };
+      }
+    } catch (err) {
+      console.warn('⚠️ [MONGODB NOTICE] MongoDB Atlas connection notice:', err.message);
+      this.mongoConnected = false;
+    }
+  }
+
+  persistToMongo(model, doc) {
+    if (!doc || !doc.id) return;
+    try {
+      model.updateOne({ id: doc.id }, { $set: doc }, { upsert: true }).catch(() => {});
+    } catch (e) {}
+  }
+
+  deleteFromMongo(model, id) {
+    if (!id) return;
+    try {
+      model.deleteOne({ id }).catch(() => {});
+    } catch (e) {}
+  }
+
   save() {
     try {
       fs.writeFileSync(DB_FILE, JSON.stringify(this.data, null, 2), 'utf8');
@@ -298,6 +386,7 @@ class Database {
   addUser(user) {
     this.data.users.push(user);
     this.save();
+    this.persistToMongo(User, user);
     return user;
   }
 
@@ -306,6 +395,7 @@ class Database {
     if (idx === -1) return null;
     this.data.users[idx] = { ...this.data.users[idx], ...fields };
     this.save();
+    this.persistToMongo(User, this.data.users[idx]);
     return this.data.users[idx];
   }
 
@@ -314,6 +404,7 @@ class Database {
     if (idx === -1) return false;
     this.data.users.splice(idx, 1);
     this.save();
+    this.deleteFromMongo(User, id);
     return true;
   }
 
@@ -324,6 +415,7 @@ class Database {
     user.lastHeartbeat = new Date().toISOString();
     user.isOnline = true;
     this.save();
+    this.persistToMongo(User, user);
     return user;
   }
 
@@ -342,6 +434,7 @@ class Database {
     if (!user) return null;
     user.isOnline = false;
     this.save();
+    this.persistToMongo(User, user);
     return user;
   }
 
@@ -357,6 +450,7 @@ class Database {
   addAssignment(asg) {
     this.data.assignments.push(asg);
     this.save();
+    this.persistToMongo(Assignment, asg);
     return asg;
   }
 
@@ -365,6 +459,7 @@ class Database {
     if (idx === -1) return null;
     this.data.assignments[idx] = { ...this.data.assignments[idx], ...fields };
     this.save();
+    this.persistToMongo(Assignment, this.data.assignments[idx]);
     return this.data.assignments[idx];
   }
 
@@ -373,6 +468,7 @@ class Database {
     if (idx === -1) return false;
     this.data.assignments.splice(idx, 1);
     this.save();
+    this.deleteFromMongo(Assignment, id);
     return true;
   }
 
@@ -397,6 +493,7 @@ class Database {
       this.data.submissions.push(sub);
     }
     this.save();
+    this.persistToMongo(Submission, sub);
     return sub;
   }
 
@@ -408,6 +505,7 @@ class Database {
   updateSettings(newSettings) {
     this.data.settings = { ...this.data.settings, ...newSettings };
     this.save();
+    Setting.updateOne({ key: 'global_settings' }, { $set: { key: 'global_settings', ...this.data.settings } }, { upsert: true }).catch(() => {});
     return this.data.settings;
   }
 
@@ -424,6 +522,7 @@ class Database {
     if (!this.data.departments) this.data.departments = [];
     this.data.departments.push(dept);
     this.save();
+    this.persistToMongo(Department, dept);
     return dept;
   }
 
@@ -433,6 +532,7 @@ class Database {
     if (idx === -1) return null;
     depts[idx] = { ...depts[idx], ...fields };
     this.save();
+    this.persistToMongo(Department, depts[idx]);
     return depts[idx];
   }
 
@@ -442,6 +542,7 @@ class Database {
     if (idx === -1) return false;
     this.data.departments.splice(idx, 1);
     this.save();
+    this.deleteFromMongo(Department, id);
     return true;
   }
 
@@ -462,6 +563,7 @@ class Database {
     if (!this.data.subjects) this.data.subjects = [];
     this.data.subjects.push(subject);
     this.save();
+    this.persistToMongo(Subject, subject);
     return subject;
   }
 
@@ -471,6 +573,7 @@ class Database {
     if (idx === -1) return null;
     subjects[idx] = { ...subjects[idx], ...fields };
     this.save();
+    this.persistToMongo(Subject, subjects[idx]);
     return subjects[idx];
   }
 
@@ -480,6 +583,7 @@ class Database {
     if (idx === -1) return false;
     this.data.subjects.splice(idx, 1);
     this.save();
+    this.deleteFromMongo(Subject, id);
     return true;
   }
 
@@ -502,6 +606,7 @@ class Database {
     if (!this.data.quizAccessRequests) this.data.quizAccessRequests = [];
     this.data.quizAccessRequests.push(request);
     this.save();
+    this.persistToMongo(QuizAccessRequest, request);
     return request;
   }
 
@@ -511,6 +616,7 @@ class Database {
     if (idx === -1) return null;
     requests[idx] = { ...requests[idx], ...fields };
     this.save();
+    this.persistToMongo(QuizAccessRequest, requests[idx]);
     return requests[idx];
   }
 
@@ -533,6 +639,7 @@ class Database {
     if (!this.data.quizPermissions) this.data.quizPermissions = [];
     this.data.quizPermissions.push(perm);
     this.save();
+    this.persistToMongo(QuizPermission, perm);
     return perm;
   }
 
@@ -542,12 +649,12 @@ class Database {
     if (idx === -1) return null;
     perms[idx] = { ...perms[idx], ...fields };
     this.save();
+    this.persistToMongo(QuizPermission, perms[idx]);
     return perms[idx];
   }
 
   getStudentQuizPermission(studentId, assignmentId) {
     const perms = this.data.quizPermissions || [];
-    // Return the most recent permission record for this student and assignment
     return perms.slice().reverse().find(p => p.studentId === studentId && p.assignmentId === assignmentId);
   }
 
@@ -569,6 +676,7 @@ class Database {
     if (!this.data.vivaSubmissions) this.data.vivaSubmissions = [];
     this.data.vivaSubmissions.push(viva);
     this.save();
+    this.persistToMongo(VivaSubmission, viva);
     return viva;
   }
 
@@ -578,6 +686,7 @@ class Database {
     if (idx === -1) return null;
     vivas[idx] = { ...vivas[idx], ...fields };
     this.save();
+    this.persistToMongo(VivaSubmission, vivas[idx]);
     return vivas[idx];
   }
 
@@ -595,6 +704,7 @@ class Database {
     if (!this.data.announcements) this.data.announcements = [];
     this.data.announcements.push(announcement);
     this.save();
+    this.persistToMongo(Announcement, announcement);
     return announcement;
   }
 
@@ -604,6 +714,7 @@ class Database {
     if (idx === -1) return false;
     this.data.announcements.splice(idx, 1);
     this.save();
+    this.deleteFromMongo(Announcement, id);
     return true;
   }
 
@@ -611,11 +722,11 @@ class Database {
   addActivityLog(log) {
     if (!this.data.activityLogs) this.data.activityLogs = [];
     this.data.activityLogs.push(log);
-    // Keep only last 500 logs
     if (this.data.activityLogs.length > 500) {
       this.data.activityLogs = this.data.activityLogs.slice(-500);
     }
     this.save();
+    this.persistToMongo(ActivityLog, log);
     return log;
   }
 
@@ -633,6 +744,7 @@ class Database {
     if (!this.data.notifications) this.data.notifications = [];
     this.data.notifications.push(notification);
     this.save();
+    this.persistToMongo(Notification, notification);
     return notification;
   }
 
@@ -642,16 +754,36 @@ class Database {
     if (idx === -1) return null;
     notifs[idx].read = true;
     this.save();
+    this.persistToMongo(Notification, notifs[idx]);
     return notifs[idx];
   }
 
   markAllNotificationsRead(userId) {
     const notifs = this.data.notifications || [];
     notifs.forEach(n => {
-      if (n.userId === userId) n.read = true;
+      if (n.userId === userId) {
+        n.read = true;
+        this.persistToMongo(Notification, n);
+      }
     });
     this.save();
   }
 }
 
 export const db = new Database();
+
+export {
+  mongoose,
+  User,
+  Department,
+  Subject,
+  Assignment,
+  Submission,
+  QuizPermission,
+  VivaSubmission,
+  QuizAccessRequest,
+  Announcement,
+  Notification,
+  ActivityLog,
+  Setting
+};
