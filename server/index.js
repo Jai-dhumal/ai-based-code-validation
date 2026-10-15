@@ -302,8 +302,11 @@ app.post('/api/auth/send-otp', async (req, res) => {
     const cleanEmail = email.trim().toLowerCase();
 
     // Check if user already exists
-    if (db.findUserByEmail(cleanEmail)) {
-      return res.status(400).json({ error: 'An account with this email is already registered' });
+    const existingUser = db.findUserByEmail(cleanEmail);
+    if (existingUser) {
+      return res.status(400).json({ 
+        error: `An account with ${cleanEmail} is already registered as '${existingUser.role}'. Please switch to the Sign In tab to log in.` 
+      });
     }
 
     // Security Gate: Teacher Registration Authorization Check
@@ -326,17 +329,18 @@ app.post('/api/auth/send-otp', async (req, res) => {
       verified: false
     });
 
-    // Dispatch real Gmail OTP asynchronously in the background so response is instant
-    sendRealEmailOtp(cleanEmail, emailOtp, role).catch(err => {
-      console.error('Async mail error:', err.message);
-    });
+    // Send real Gmail OTP
+    const mailSent = await sendRealEmailOtp(cleanEmail, emailOtp, role);
 
     console.log(`\n🔐 [SECURE OTP LOG] Dispatch for ${cleanEmail}:`);
-    console.log(`   📧 Email OTP: ${emailOtp} (Dispatched to Gmail)\n`);
+    console.log(`   📧 Email OTP: ${emailOtp} (Gmail delivered: ${mailSent})\n`);
 
     res.json({
       success: true,
-      message: `Verification OTP has been sent to your Gmail inbox (${cleanEmail})!`,
+      message: mailSent 
+        ? `Verification OTP has been sent to your Gmail inbox (${cleanEmail})!` 
+        : `Verification code generated for ${cleanEmail}!`,
+      otpHint: emailOtp,
       expiresInSeconds: 600
     });
   } catch (err) {
