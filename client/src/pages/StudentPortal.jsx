@@ -498,7 +498,8 @@ export default function StudentPortal({
         body: JSON.stringify({
           code,
           assignmentId: selectedAssignment.id,
-          studentId: currentUser?.id
+          studentId: currentUser?.id,
+          language: selectedLanguage
         })
       });
 
@@ -784,10 +785,12 @@ export default function StudentPortal({
     }
   };
 
-  const isClean = plagResult && plagResult.score < 35;
-  const isBorderline = plagResult && plagResult.score >= 35 && plagResult.score < 75;
-  const isHighPlag = plagResult && plagResult.score >= 75;
-  const canTakeQuiz = isClean || isBorderline;
+  const functionalPassed = plagResult ? plagResult.functionalPassed !== false : true;
+  const hasFunctionalError = plagResult && plagResult.functionalPassed === false;
+  const isClean = plagResult && functionalPassed && plagResult.score < 35;
+  const isBorderline = plagResult && functionalPassed && plagResult.score >= 35 && plagResult.score < 75;
+  const isHighPlag = plagResult && functionalPassed && plagResult.score >= 75;
+  const canTakeQuiz = (isClean || isBorderline) && functionalPassed;
 
   return (
     <div className="space-y-6 font-['Plus_Jakarta_Sans',sans-serif]">
@@ -1243,7 +1246,45 @@ export default function StudentPortal({
       {/* ========================================================================= */}
       {plagResult && (
         <div className="space-y-4">
-          
+          {/* 0. If Code Failed Functional Execution or Output Mismatch */}
+          {hasFunctionalError && (
+            <div className="bg-rose-50 dark:bg-rose-950/30 border border-rose-300 dark:border-rose-800 rounded-3xl p-6 text-rose-950 dark:text-rose-100 space-y-3 card-float">
+              <div className="flex items-start space-x-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-rose-600 text-white flex items-center justify-center font-black text-xl shrink-0 shadow-sm animate-float">
+                  ✕
+                </div>
+                <div className="grow">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-md bg-rose-200 dark:bg-rose-900 text-rose-800 dark:text-rose-200 font-bold text-[10px] uppercase">
+                      {plagResult.functionalStatus || 'Requirement Mismatch'}
+                    </span>
+                    <h4 className="font-extrabold text-sm text-rose-900 dark:text-rose-200">
+                      Output Verification Failed
+                    </h4>
+                  </div>
+                  <p className="text-xs text-rose-700 dark:text-rose-300 mt-1 font-medium">
+                    {plagResult.functionalReason}
+                  </p>
+                  {plagResult.executionOutput && (
+                    <div className="mt-2.5 p-3 bg-slate-900 rounded-xl font-mono text-xs text-emerald-400 border border-slate-800">
+                      <span className="text-slate-400 text-[10px] uppercase tracking-wider block mb-1">Your Program Output:</span>
+                      {plagResult.executionOutput}
+                    </div>
+                  )}
+                  {plagResult.executionError && (
+                    <div className="mt-2 p-2.5 bg-rose-950/80 rounded-xl font-mono text-xs text-rose-300 border border-rose-800">
+                      <span className="text-rose-400 text-[10px] uppercase tracking-wider block mb-1">Execution Error:</span>
+                      {plagResult.executionError}
+                    </div>
+                  )}
+                  <p className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold mt-2.5">
+                    👉 Please update your program so that it prints or computes the actual expected output for "{selectedAssignment.title}". Once your output matches requirements, you can proceed to the viva quiz.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 1. If Code is Clean */}
           {isClean && (
             <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-3xl p-6 text-emerald-950 dark:text-emerald-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 card-float">

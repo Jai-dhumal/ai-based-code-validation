@@ -127,7 +127,7 @@ app.get('/api/health', (req, res) => {
 // Login: Hash-compare using bcrypt with legacy plain-text migration
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, expectedRole } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
@@ -143,6 +143,17 @@ app.post('/api/auth/login', async (req, res) => {
 
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    if (expectedRole && user.role !== expectedRole) {
+      const portalNames = {
+        student: 'Student Portal',
+        teacher: 'Faculty & Guide Portal',
+        admin: 'Institutional Admin Portal'
+      };
+      return res.status(403).json({
+        error: `Access Denied: This account is registered as '${user.role}'. Please select the "${portalNames[user.role] || user.role}" tab to sign in.`
+      });
     }
 
 
@@ -449,6 +460,16 @@ app.post('/api/auth/google', async (req, res) => {
     let user = db.findUserByEmail(cleanEmail);
 
     if (user) {
+      if (role && user.role !== role) {
+        const portalNames = {
+          student: 'Student Portal',
+          teacher: 'Faculty & Guide Portal',
+          admin: 'Institutional Admin Portal'
+        };
+        return res.status(403).json({
+          error: `Access Denied: This Google account is registered as '${user.role}'. Please select the "${portalNames[user.role] || user.role}" tab to sign in.`
+        });
+      }
       // User exists -> sign them in
       db.updateHeartbeat(user.id);
       const token = generateToken(user);
@@ -508,17 +529,16 @@ function getPythonCommand() {
   return 'python';
 }
 
-// Code Compilation & Execution Endpoint (/api/compile)
-app.post('/api/compile', async (req, res) => {
+// Reusable program compiler & executor
+async function executeCodeInternal({ language = 'python', code = '', stdin = '' }) {
   const startTime = Date.now();
   let srcFile = null;
   let exeFile = null;
   let javaDir = null;
 
   try {
-    const { language = 'python', code = '', stdin = '' } = req.body;
     if (!code || !code.trim()) {
-      return res.status(400).json({ error: 'Code content is required for execution' });
+      return { stdout: '', stderr: 'Code is empty', status: 'Runtime Error', time: '0.00' };
     }
 
     const tmpId = `run_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -568,102 +588,213 @@ app.post('/api/compile', async (req, res) => {
       runCmd = 'java';
       runArgs = ['-cp', javaDir, className];
     } else {
-      return res.json({
+      return {
         stdout: `[${lang.toUpperCase()} Simulated Execution]\nSyntax check verified.\nOutput:\nHello, World!`,
         stderr: '',
         status: 'Accepted',
         time: '0.02',
         memory: 1024
-      });
+      };
     }
 
-    // Step 1: Compilation (if language requires pre-compilation)
+    // Step 1: Compilation
     if (compileCmd) {
       try {
         const cRes = spawnSync(compileCmd, compileArgs, { encoding: 'utf8', timeout: 12000 });
         if (cRes.status !== 0) {
           const compErr = cRes.stderr || cRes.stdout || 'Compilation failed';
-          return res.json({
+          return {
             stdout: '',
             stderr: compErr.trim(),
             status: 'Compile Error',
             time: ((Date.now() - startTime) / 1000).toFixed(2),
             memory: null
-          });
+          };
         }
       } catch (err) {
-        return res.json({
+        return {
           stdout: '',
           stderr: `Compiler (${compileCmd}) unavailable: ${err.message}`,
           status: 'Compile Error',
           time: '0.00',
           memory: null
-        });
+        };
       }
     }
 
     // Step 2: Execution
-    let stdout = '';
-    let stderr = '';
-    const child = spawn(runCmd, runArgs, { timeout: 8000 });
+    return new Promise((resolve) => {
+      let stdout = '';
+      let stderr = '';
+      let child;
 
-    if (stdin) {
-      child.stdin.write(stdin);
-      child.stdin.end();
-    }
-
-    child.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
-
-    child.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    child.on('error', (err) => {
-      const executionTime = ((Date.now() - startTime) / 1000).toFixed(2);
-      // Clean up files
       try {
-        if (srcFile && fs.existsSync(srcFile)) fs.unlinkSync(srcFile);
-        if (exeFile && fs.existsSync(exeFile)) fs.unlinkSync(exeFile);
-        if (javaDir && fs.existsSync(javaDir)) fs.rmSync(javaDir, { recursive: true, force: true });
-      } catch (e) {}
+        child = spawn(runCmd, runArgs, { timeout: 8000 });
+      } catch (err) {
+        return resolve({
+          stdout: '',
+          stderr: `Execution error (${runCmd}): ${err.message}`,
+          status: 'Runtime Error',
+          time: '0.00',
+          memory: null
+        });
+      }
 
-      return res.json({
-        stdout: '',
-        stderr: `Execution error (${runCmd}): ${err.message}`,
-        status: 'Runtime Error',
-        time: executionTime,
-        memory: null
+      if (stdin) {
+        child.stdin.write(stdin);
+        child.stdin.end();
+      }
+
+      child.stdout.on('data', (d) => { stdout += d.toString(); });
+      child.stderr.on('data', (d) => { stderr += d.toString(); });
+
+      const cleanup = () => {
+        try {
+          if (srcFile && fs.existsSync(srcFile)) fs.unlinkSync(srcFile);
+          if (exeFile && fs.existsSync(exeFile)) fs.unlinkSync(exeFile);
+          if (javaDir && fs.existsSync(javaDir)) fs.rmSync(javaDir, { recursive: true, force: true });
+        } catch (e) {}
+      };
+
+      child.on('error', (err) => {
+        cleanup();
+        resolve({
+          stdout: '',
+          stderr: err.message,
+          status: 'Runtime Error',
+          time: ((Date.now() - startTime) / 1000).toFixed(2),
+          memory: null
+        });
       });
-    });
 
-    child.on('close', (exitCode) => {
-      const executionTime = ((Date.now() - startTime) / 1000).toFixed(2);
-      // Clean up files
-      try {
-        if (srcFile && fs.existsSync(srcFile)) fs.unlinkSync(srcFile);
-        if (exeFile && fs.existsSync(exeFile)) fs.unlinkSync(exeFile);
-        if (javaDir && fs.existsSync(javaDir)) fs.rmSync(javaDir, { recursive: true, force: true });
-      } catch (e) {}
-
-      res.json({
-        stdout: stdout.trim(),
-        stderr: stderr.trim(),
-        status: exitCode === 0 ? 'Accepted' : (stderr ? 'Runtime Error' : 'Wrong Answer'),
-        time: executionTime,
-        memory: Math.round(1024 + Math.random() * 2048)
+      child.on('close', (exitCode) => {
+        cleanup();
+        resolve({
+          stdout: stdout.trim(),
+          stderr: stderr.trim(),
+          status: exitCode === 0 ? 'Accepted' : (stderr ? 'Runtime Error' : 'Wrong Answer'),
+          time: ((Date.now() - startTime) / 1000).toFixed(2),
+          memory: Math.round(1024 + Math.random() * 2048)
+        });
       });
     });
 
   } catch (err) {
-    // Clean up files
     try {
       if (srcFile && fs.existsSync(srcFile)) fs.unlinkSync(srcFile);
       if (exeFile && fs.existsSync(exeFile)) fs.unlinkSync(exeFile);
       if (javaDir && fs.existsSync(javaDir)) fs.rmSync(javaDir, { recursive: true, force: true });
     } catch (e) {}
 
+    return {
+      stdout: '',
+      stderr: err.message,
+      status: 'Runtime Error',
+      time: '0.00',
+      memory: null
+    };
+  }
+}
+
+// Functional correctness and output verification helper
+async function validateFunctionalCorrectness({ code, language, assignment }) {
+  const execResult = await executeCodeInternal({ language, code });
+  
+  if (execResult.status === 'Compile Error' || execResult.status === 'Runtime Error') {
+    return {
+      passed: false,
+      reason: `Program failed to execute (${execResult.status}): ${execResult.stderr || execResult.stdout || 'Process crashed'}`,
+      stdout: execResult.stdout,
+      stderr: execResult.stderr,
+      status: execResult.status
+    };
+  }
+
+  if (!assignment) {
+    return { passed: true, stdout: execResult.stdout, status: execResult.status };
+  }
+
+  const title = (assignment.title || '').toLowerCase();
+  const desc = (assignment.description || '').toLowerCase();
+  const actualOut = (execResult.stdout || '').trim().toLowerCase();
+
+  // 1. Explicit expectedOutput property on assignment
+  if (assignment.expectedOutput) {
+    const expected = assignment.expectedOutput.trim().toLowerCase();
+    if (!actualOut.includes(expected)) {
+      return {
+        passed: false,
+        reason: `Output mismatch. Expected output to contain "${assignment.expectedOutput.trim()}", but got: "${execResult.stdout.trim() || '(no output)'}"`,
+        stdout: execResult.stdout,
+        expected: assignment.expectedOutput,
+        status: 'Wrong Output'
+      };
+    }
+  }
+
+  // 2. "print <phrase>" assignments (e.g. "print Jay Ganesh")
+  if (title.includes('print ') || desc.includes('print ')) {
+    const match = title.match(/print\s+(.+)/i) || desc.match(/print\s+([a-zA-Z0-9\s]+?)(?:\s+on|\s+to|\.|$)/i);
+    if (match) {
+      const targetPhrase = match[1].trim().toLowerCase();
+      if (!actualOut.includes(targetPhrase)) {
+        return {
+          passed: false,
+          reason: `Output requirement not met: The assignment requires printing "${match[1].trim()}", but your program output: "${execResult.stdout.trim() || '(no output)'}"`,
+          stdout: execResult.stdout,
+          expected: match[1].trim(),
+          status: 'Wrong Output'
+        };
+      }
+    }
+  }
+
+  // 3. Binary Search Tree assignment
+  if (title.includes('binary search tree') || title.includes('bst')) {
+    const codeLower = code.toLowerCase();
+    const hasBST = codeLower.includes('tree') || codeLower.includes('bst') || (codeLower.includes('left') && codeLower.includes('right'));
+    const hasOps = codeLower.includes('insert') || codeLower.includes('search') || codeLower.includes('order');
+    if (!hasBST || !hasOps) {
+      return {
+        passed: false,
+        reason: 'Requirement not met: Binary Search Tree solution must define tree node structure and operations (such as insert, search, or traversal).',
+        stdout: execResult.stdout,
+        status: 'Incomplete Implementation'
+      };
+    }
+  }
+
+  // 4. Dijkstra Shortest Path
+  if (title.includes('dijkstra') || title.includes('shortest path')) {
+    const codeLower = code.toLowerCase();
+    const hasGraph = codeLower.includes('graph') || codeLower.includes('dist') || codeLower.includes('weight') || codeLower.includes('heap') || codeLower.includes('dijkstra');
+    if (!hasGraph) {
+      return {
+        passed: false,
+        reason: 'Requirement not met: Shortest path solution must define graph representation and distance relaxation logic.',
+        stdout: execResult.stdout,
+        status: 'Incomplete Implementation'
+      };
+    }
+  }
+
+  return {
+    passed: true,
+    stdout: execResult.stdout,
+    status: 'Accepted'
+  };
+}
+
+// Code Compilation & Execution Endpoint (/api/compile)
+app.post('/api/compile', async (req, res) => {
+  try {
+    const { language = 'python', code = '', stdin = '' } = req.body;
+    if (!code || !code.trim()) {
+      return res.status(400).json({ error: 'Code content is required for execution' });
+    }
+    const result = await executeCodeInternal({ language, code, stdin });
+    res.json(result);
+  } catch (err) {
     res.status(500).json({
       stdout: '',
       stderr: err.message,
@@ -1111,15 +1242,25 @@ app.post('/api/upload', upload.single('codeFile'), (req, res) => {
 // 5. VALIDATION & CODE ANALYSIS
 // ==========================================
 
-// Tier-1 Plagiarism Check
-app.post('/api/validate/tier1', authenticate, (req, res) => {
+// Tier-1 Plagiarism & Functional Output Check
+app.post('/api/validate/tier1', authenticate, async (req, res) => {
   try {
-    const { code, assignmentId } = req.body;
+    const { code, assignmentId, language } = req.body;
     const studentId = req.user.role === 'student' ? req.user.id : (req.body.studentId || req.user.id);
 
     if (!code || !code.trim()) {
       return res.status(400).json({ error: 'Code content is required for validation' });
     }
+
+    const assignment = assignmentId ? db.getAssignmentById(assignmentId) : null;
+    const resolvedLang = language || (assignment && assignment.languages ? assignment.languages[0] : 'python');
+
+    // Step 1: Functional Execution & Output Verification
+    const funcCheck = await validateFunctionalCorrectness({
+      code,
+      language: resolvedLang,
+      assignment
+    });
 
     const settings = db.getSettings();
     let pastSubs = [];
@@ -1133,12 +1274,21 @@ app.post('/api/validate/tier1', authenticate, (req, res) => {
       pastSubs = db.getSubmissions().filter(s => s.studentId !== studentId);
     }
 
-    const result = runTier1Check(code, pastSubs, {
+    // Step 2: Plagiarism Winnowing Check
+    const plagResult = runTier1Check(code, pastSubs, {
       lowThreshold: settings.tier1ThresholdLow || 25,
       highThreshold: settings.tier1ThresholdHigh || 60
     });
 
-    res.json(result);
+    res.json({
+      ...plagResult,
+      functionalPassed: funcCheck.passed,
+      functionalReason: funcCheck.reason || null,
+      functionalStatus: funcCheck.status,
+      executionOutput: funcCheck.stdout || '',
+      executionError: funcCheck.stderr || '',
+      canProceedToQuiz: funcCheck.passed && !plagResult.requiresTier2 && plagResult.score < 35
+    });
   } catch (err) {
     res.status(500).json({ error: 'Tier-1 check failed: ' + err.message });
   }
