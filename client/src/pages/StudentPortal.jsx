@@ -347,6 +347,7 @@ export default function StudentPortal({
   const currentSubmission = (submissions || []).find(
     s => s.assignmentId === selectedAssignment.id && s.studentId === currentUser?.id
   );
+  const hasSubmittedCurrentAssignment = Boolean(currentSubmission);
   // RUN & COMPILE CODE (Instant Execution)
   const handleRunCode = async () => {
     if (!code || !code.trim()) {

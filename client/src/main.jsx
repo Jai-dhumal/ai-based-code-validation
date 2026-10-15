@@ -19,9 +19,8 @@ class RootErrorBoundary extends React.Component {
 
   handleReset = () => {
     try {
-      localStorage.removeItem('ai_validate_user');
-      localStorage.removeItem('ai_validate_token');
-      localStorage.setItem('ai_validate_theme', 'light');
+      localStorage.clear();
+      sessionStorage.clear();
     } catch (e) {}
     window.location.reload();
   };
@@ -30,9 +29,9 @@ class RootErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen bg-slate-50 text-slate-800 flex items-center justify-center p-6 font-['Plus_Jakarta_Sans',sans-serif]">
-          <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
-            <div className="w-14 h-14 bg-indigo-50 border border-indigo-200 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-sm">
-              ✨
+          <div className="max-w-lg w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center space-y-4">
+            <div className="w-14 h-14 bg-rose-50 border border-rose-200 text-rose-600 rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-sm">
+              ⚠️
             </div>
             <div>
               <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">
@@ -42,10 +41,10 @@ class RootErrorBoundary extends React.Component {
                 JSPM BSIOTR Academic Portal
               </p>
             </div>
-            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-left">
-              <p className="text-xs font-bold text-slate-700 mb-1">Session Status</p>
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                A browser session synchronization issue occurred. Click below to refresh your session and return to the portal.
+            <div className="p-3.5 bg-rose-50 rounded-2xl border border-rose-200 text-left">
+              <p className="text-xs font-bold text-rose-800 mb-1">Error Details</p>
+              <p className="text-[11px] text-rose-600 font-mono leading-relaxed break-all">
+                {this.state.error?.message || String(this.state.error)}
               </p>
             </div>
             <div className="flex gap-3 pt-2">
@@ -54,7 +53,7 @@ class RootErrorBoundary extends React.Component {
                 onClick={this.handleReset}
                 className="flex-1 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition"
               >
-                Clear Cache &amp; Sign In
+                Clear Cache &amp; Reset
               </button>
               <button
                 type="button"
