@@ -10,45 +10,8 @@ import { BookOpen, CheckCircle2, Clock, ShieldCheck } from 'lucide-react';
 
 const authHeaders = () => ({
   'Content-Type': 'application/json',
-  'Authorization': 'Bearer ' + localStorage.getItem('ai_validate_token')
+  'Authorization': 'Bearer ' + (localStorage.getItem('ai_validate_token') || '')
 });
-
-// Resilient Error Boundary to completely prevent blank/black screen crashes
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-  componentDidCatch(error, errorInfo) {
-    console.error('Portal ErrorBoundary caught error:', error, errorInfo);
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen bg-slate-50 text-slate-800 flex items-center justify-center p-6 font-['Plus_Jakarta_Sans',sans-serif]">
-          <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-xl text-center">
-            <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 font-bold text-xl">✨</div>
-            <h2 className="text-lg font-extrabold text-slate-900 mb-2">Welcome to Your Dashboard</h2>
-            <p className="text-xs text-slate-600 mb-6">Portal environment synchronized successfully. Click below to load your view.</p>
-            <button
-              onClick={() => {
-                localStorage.setItem('ai_validate_theme', 'light');
-                window.location.reload();
-              }}
-              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition"
-            >
-              Continue to Dashboard
-            </button>
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -56,11 +19,12 @@ export default function App() {
       const saved = localStorage.getItem('ai_validate_user');
       return saved ? JSON.parse(saved) : null;
     } catch (e) {
+      localStorage.removeItem('ai_validate_user');
       return null;
     }
   });
 
-  // Dark/Light Theme State - defaults to modern, bright light theme
+  // Light theme by default
   const [isDark, setIsDark] = useState(() => {
     try {
       return localStorage.getItem('ai_validate_theme') === 'dark';
@@ -79,9 +43,7 @@ export default function App() {
     }
   }, [isDark]);
 
-  const handleToggleTheme = () => {
-    setIsDark(prev => !prev);
-  };
+  const handleToggleTheme = () => setIsDark(prev => !prev);
 
   const [assignments, setAssignments] = useState([]);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
@@ -99,16 +61,14 @@ export default function App() {
       const [healthRes, asgRes, subRes, setRes] = await Promise.all([
         fetch('/api/health'),
         fetch('/api/assignments', { headers }),
-        fetch('/api/submissions', { headers }),
+        fetch('/api/submissions', { headers }).catch(() => ({ ok: false })),
         fetch('/api/settings', { headers })
       ]);
 
-      const [healthData, asgData, subData, setData] = await Promise.all([
-        healthRes.json(),
-        asgRes.json(),
-        subRes.json(),
-        setRes.json()
-      ]);
+      const healthData = await healthRes.json();
+      const asgData = await asgRes.json();
+      const subData = subRes.ok ? await subRes.json() : [];
+      const setData = await setRes.json();
 
       setSystemStatus(healthData);
       setAssignments(Array.isArray(asgData) ? asgData : []);
@@ -129,24 +89,17 @@ export default function App() {
     fetchData();
   }, []);
 
-  // Heartbeat interval every 60 seconds while logged in
+  // Heartbeat every 60s while logged in
   useEffect(() => {
     if (!currentUser) return;
-
     const intervalId = setInterval(async () => {
       try {
-        await fetch('/api/auth/heartbeat', {
-          method: 'POST',
-          headers: authHeaders()
-        });
+        await fetch('/api/auth/heartbeat', { method: 'POST', headers: authHeaders() });
       } catch (err) {
         console.error('Heartbeat error:', err);
       }
     }, 60000);
-
-    return () => {
-      clearInterval(intervalId);
-    };
+    return () => clearInterval(intervalId);
   }, [currentUser]);
 
   const handleLoginSuccess = (user, token) => {
@@ -157,7 +110,7 @@ export default function App() {
       if (authToken) {
         localStorage.setItem('ai_validate_token', authToken);
       }
-      // Force elegant light theme on sign-in
+      // Force light theme
       localStorage.setItem('ai_validate_theme', 'light');
       setIsDark(false);
       document.documentElement.classList.remove('dark');
@@ -167,10 +120,7 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: authHeaders()
-      });
+      await fetch('/api/auth/logout', { method: 'POST', headers: authHeaders() });
     } catch (e) {
       console.error('Logout error:', e);
     } finally {
@@ -205,17 +155,16 @@ export default function App() {
     }
   };
 
-  // If user is not logged in, render the Dedicated Login / Sign Up Page
+  // If not logged in, show login page
   if (!currentUser) {
     return <LoginPage onLoginSuccess={handleLoginSuccess} isDark={isDark} onToggleTheme={handleToggleTheme} />;
   }
 
   return (
-    <ErrorBoundary>
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col font-['Plus_Jakarta_Sans',sans-serif] transition-colors duration-200">
-        
-        {/* Top Navigation Bar with Theme Switcher */}
-        <Navbar
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col font-['Plus_Jakarta_Sans',sans-serif] transition-colors duration-200">
+      
+      {/* Top Navigation Bar */}
+      <Navbar
         currentUser={currentUser}
         onLogout={handleLogout}
         onOpenSettings={() => setIsSettingsOpen(true)}
@@ -228,12 +177,12 @@ export default function App() {
       {/* Main Role-Specific View */}
       <main className="grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         
-        {/* 1. ADMINISTRATOR ROLE */}
+        {/* ADMINISTRATOR */}
         {currentUser.role === 'admin' && (
           <AdminPortal currentUser={currentUser} />
         )}
 
-        {/* 2. TEACHER ROLE (Power BI Student Performance Evaluation Dashboard) */}
+        {/* TEACHER */}
         {currentUser.role === 'teacher' && (
           <TeacherPortal
             currentUser={currentUser}
@@ -244,7 +193,7 @@ export default function App() {
           />
         )}
 
-        {/* 3. STUDENT ROLE */}
+        {/* STUDENT */}
         {currentUser.role === 'student' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
@@ -329,7 +278,7 @@ export default function App() {
 
             </div>
 
-            {/* Right Main Area: Student Assignment & 3-Step Validation */}
+            {/* Right Main Area: Student Portal */}
             <div className="lg:col-span-8 xl:col-span-9">
               <StudentPortal
                 currentUser={currentUser}
@@ -362,7 +311,6 @@ export default function App() {
         onProfileUpdate={handleProfileUpdate}
       />
 
-      </div>
-    </ErrorBoundary>
+    </div>
   );
 }
