@@ -226,12 +226,12 @@ function generateOtp() {
 // Nodemailer SMTP Transporter: supports standard SMTP_* and backward-compatible GMAIL_*
 let cachedTransporter = null;
 
-export function getMailTransporter() {
+export function getMailTransporter(forceFresh = false) {
   if (process.env.NODE_ENV === 'test') {
     return nodemailer.createTransport({ jsonTransport: true });
   }
 
-  if (cachedTransporter) return cachedTransporter;
+  if (cachedTransporter && !forceFresh) return cachedTransporter;
 
   const host = process.env.SMTP_HOST || 'smtp.gmail.com';
   const port = parseInt(process.env.SMTP_PORT || '465', 10);
@@ -247,9 +247,7 @@ export function getMailTransporter() {
       port,
       secure,
       auth: { user, pass },
-      pool: true,
-      maxConnections: 5,
-      maxMessages: 100,
+      pool: false, // Disabling pooling prevents dead idle socket hang on smtp.gmail.com
       connectionTimeout: 10000,
       greetingTimeout: 10000,
       socketTimeout: 15000
@@ -346,6 +344,26 @@ export async function sendRealEmailOtp(toEmail, otpCode, role, customTransporter
   } catch (err) {
     console.error(`❌ [MAIL ERROR] Failed to send email to ${toEmail}:`, err.message);
 
+    // Auto-retry once with a fresh connection if connection timed out or socket dropped
+    if (!customTransporter && (err.code === 'ETIMEDOUT' || err.code === 'ESOCKETTIMEDOUT' || err.code === 'ECONNECTION' || (err.message || '').includes('timed out'))) {
+      console.warn(`🔄 [RETRYING] Retrying email dispatch for ${toEmail} with a fresh SMTP socket...`);
+      try {
+        cachedTransporter = null;
+        const freshTransporter = getMailTransporter(true);
+        if (freshTransporter) {
+          const retryInfo = await freshTransporter.sendMail(mailOptions);
+          console.log(`📧 [EMAIL SENT ON RETRY] Verification email accepted by SMTP server for ${toEmail} (Message ID: ${retryInfo.messageId})`);
+          return {
+            success: true,
+            info: retryInfo
+          };
+        }
+      } catch (retryErr) {
+        console.error(`❌ [MAIL RETRY ERROR] Retry failed for ${toEmail}:`, retryErr.message);
+        err = retryErr;
+      }
+    }
+
     const msg = (err.message || '').toLowerCase();
     const code = err.code || '';
     const responseCode = err.responseCode || 0;
@@ -438,12 +456,12 @@ app.post('/api/auth/send-otp', async (req, res) => {
     const OTP_TTL_SECONDS = 300; // 5 minutes
     const expiresAt = Date.now() + OTP_TTL_SECONDS * 1000;
 
-    // Attempt real email dispatch with timeout race (15s allows for initial SSL handshake)
+    // Attempt real email dispatch with timeout race (20s allows for initial SSL handshake & auto-retry)
     let dispatchResult = null;
     try {
       dispatchResult = await Promise.race([
         sendRealEmailOtp(cleanEmail, emailOtp, role),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('SMTP connection timed out')), 15000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('SMTP connection timed out')), 20000))
       ]);
     } catch (e) {
       console.warn(`⚠️ [MAIL DISPATCH NOTICE] ${cleanEmail}: ${e.message}`);
