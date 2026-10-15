@@ -131,10 +131,19 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const user = db.findUserByEmail(email.trim());
+    const cleanEmail = email.trim().toLowerCase();
+    let user = db.findUserByEmail(cleanEmail);
+    if (!user && cleanEmail === 'student@jspm.edu') {
+      user = db.findUserByEmail('jaydeep@jspm.edu') || db.findUserByEmail('vansh@jspm.edu');
+    }
+    if (!user && cleanEmail === 'teacher@jspm.edu') {
+      user = db.findUserByEmail('nitin.shivale@jspm.edu');
+    }
+
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
+
 
     let isPasswordValid = false;
     const isBcryptHash = typeof user.password === 'string' &&
