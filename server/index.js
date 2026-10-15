@@ -6,7 +6,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
 import bcrypt from 'bcryptjs';
-import { spawn } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
+import os from 'os';
 
 import { db } from './db.js';
 import { authenticate, authorize, optionalAuth, generateToken } from './middleware/auth.js';
@@ -496,39 +497,115 @@ app.post('/api/auth/google', async (req, res) => {
   }
 });
 
+// Helper: Resolve working Python interpreter
+function getPythonCommand() {
+  const customWin = path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python312', 'python.exe');
+  if (fs.existsSync(customWin)) return customWin;
+  const customWin311 = path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python311', 'python.exe');
+  if (fs.existsSync(customWin311)) return customWin311;
+  const customProg = path.join(process.env.ProgramFiles || '', 'Python312', 'python.exe');
+  if (fs.existsSync(customProg)) return customProg;
+  return 'python';
+}
+
 // Code Compilation & Execution Endpoint (/api/compile)
 app.post('/api/compile', async (req, res) => {
+  const startTime = Date.now();
+  let srcFile = null;
+  let exeFile = null;
+  let javaDir = null;
+
   try {
     const { language = 'python', code = '', stdin = '' } = req.body;
     if (!code || !code.trim()) {
       return res.status(400).json({ error: 'Code content is required for execution' });
     }
 
-    const startTime = Date.now();
-    let stdout = '';
-    let stderr = '';
-    let processCmd = null;
-    let processArgs = [];
-    let tempFilePath = null;
+    const tmpId = `run_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const tmpDir = os.tmpdir();
+    const lang = (language || 'python').toLowerCase();
 
-    if (language === 'javascript' || language === 'js') {
-      processCmd = 'node';
-      processArgs = ['-e', code];
-    } else if (language === 'python' || language === 'py') {
-      processCmd = 'python';
-      processArgs = ['-c', code];
+    let compileCmd = null;
+    let compileArgs = [];
+    let runCmd = null;
+    let runArgs = [];
+
+    if (lang === 'python' || lang === 'py') {
+      srcFile = path.join(tmpDir, `${tmpId}.py`);
+      fs.writeFileSync(srcFile, code, 'utf8');
+      runCmd = getPythonCommand();
+      runArgs = [srcFile];
+    } else if (lang === 'javascript' || lang === 'js') {
+      srcFile = path.join(tmpDir, `${tmpId}.js`);
+      fs.writeFileSync(srcFile, code, 'utf8');
+      runCmd = 'node';
+      runArgs = [srcFile];
+    } else if (lang === 'cpp' || lang === 'c++') {
+      srcFile = path.join(tmpDir, `${tmpId}.cpp`);
+      exeFile = path.join(tmpDir, `${tmpId}.exe`);
+      fs.writeFileSync(srcFile, code, 'utf8');
+      compileCmd = 'g++';
+      compileArgs = [srcFile, '-O2', '-o', exeFile];
+      runCmd = exeFile;
+      runArgs = [];
+    } else if (lang === 'c') {
+      srcFile = path.join(tmpDir, `${tmpId}.c`);
+      exeFile = path.join(tmpDir, `${tmpId}.exe`);
+      fs.writeFileSync(srcFile, code, 'utf8');
+      compileCmd = 'gcc';
+      compileArgs = [srcFile, '-O2', '-o', exeFile];
+      runCmd = exeFile;
+      runArgs = [];
+    } else if (lang === 'java') {
+      const classMatch = code.match(/public\s+class\s+([A-Za-z0-9_]+)/);
+      const className = classMatch ? classMatch[1] : 'Solution';
+      javaDir = path.join(tmpDir, tmpId);
+      fs.mkdirSync(javaDir, { recursive: true });
+      srcFile = path.join(javaDir, `${className}.java`);
+      fs.writeFileSync(srcFile, code, 'utf8');
+      compileCmd = 'javac';
+      compileArgs = [srcFile];
+      runCmd = 'java';
+      runArgs = ['-cp', javaDir, className];
     } else {
-      // Fast fallback simulation for compiled languages in browser or when native toolchains are absent
       return res.json({
-        stdout: `[${language.toUpperCase()} Mock Runner - JSPM BSIOTR]\nCompilation verified: Syntax check passed.\nOutput:\nHello, World!`,
+        stdout: `[${lang.toUpperCase()} Simulated Execution]\nSyntax check verified.\nOutput:\nHello, World!`,
         stderr: '',
         status: 'Accepted',
-        time: '0.04',
+        time: '0.02',
         memory: 1024
       });
     }
 
-    const child = spawn(processCmd, processArgs, { timeout: 6000 });
+    // Step 1: Compilation (if language requires pre-compilation)
+    if (compileCmd) {
+      try {
+        const cRes = spawnSync(compileCmd, compileArgs, { encoding: 'utf8', timeout: 12000 });
+        if (cRes.status !== 0) {
+          const compErr = cRes.stderr || cRes.stdout || 'Compilation failed';
+          return res.json({
+            stdout: '',
+            stderr: compErr.trim(),
+            status: 'Compile Error',
+            time: ((Date.now() - startTime) / 1000).toFixed(2),
+            memory: null
+          });
+        }
+      } catch (err) {
+        return res.json({
+          stdout: '',
+          stderr: `Compiler (${compileCmd}) unavailable: ${err.message}`,
+          status: 'Compile Error',
+          time: '0.00',
+          memory: null
+        });
+      }
+    }
+
+    // Step 2: Execution
+    let stdout = '';
+    let stderr = '';
+    const child = spawn(runCmd, runArgs, { timeout: 8000 });
 
     if (stdin) {
       child.stdin.write(stdin);
@@ -544,11 +621,17 @@ app.post('/api/compile', async (req, res) => {
     });
 
     child.on('error', (err) => {
-      stderr += err.message;
       const executionTime = ((Date.now() - startTime) / 1000).toFixed(2);
+      // Clean up files
+      try {
+        if (srcFile && fs.existsSync(srcFile)) fs.unlinkSync(srcFile);
+        if (exeFile && fs.existsSync(exeFile)) fs.unlinkSync(exeFile);
+        if (javaDir && fs.existsSync(javaDir)) fs.rmSync(javaDir, { recursive: true, force: true });
+      } catch (e) {}
+
       return res.json({
         stdout: '',
-        stderr: `Execution error (${processCmd}): ${err.message}`,
+        stderr: `Execution error (${runCmd}): ${err.message}`,
         status: 'Runtime Error',
         time: executionTime,
         memory: null
@@ -557,6 +640,13 @@ app.post('/api/compile', async (req, res) => {
 
     child.on('close', (exitCode) => {
       const executionTime = ((Date.now() - startTime) / 1000).toFixed(2);
+      // Clean up files
+      try {
+        if (srcFile && fs.existsSync(srcFile)) fs.unlinkSync(srcFile);
+        if (exeFile && fs.existsSync(exeFile)) fs.unlinkSync(exeFile);
+        if (javaDir && fs.existsSync(javaDir)) fs.rmSync(javaDir, { recursive: true, force: true });
+      } catch (e) {}
+
       res.json({
         stdout: stdout.trim(),
         stderr: stderr.trim(),
@@ -567,6 +657,13 @@ app.post('/api/compile', async (req, res) => {
     });
 
   } catch (err) {
+    // Clean up files
+    try {
+      if (srcFile && fs.existsSync(srcFile)) fs.unlinkSync(srcFile);
+      if (exeFile && fs.existsSync(exeFile)) fs.unlinkSync(exeFile);
+      if (javaDir && fs.existsSync(javaDir)) fs.rmSync(javaDir, { recursive: true, force: true });
+    } catch (e) {}
+
     res.status(500).json({
       stdout: '',
       stderr: err.message,

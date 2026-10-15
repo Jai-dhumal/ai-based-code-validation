@@ -50,6 +50,99 @@ const DEMO_PRESETS = {
   }
 };
 
+const STARTER_CODES = {
+  python: `# Python Solution
+print("Jay Ganesh")
+`,
+  cpp: `// C++ Solution
+#include <iostream>
+using namespace std;
+
+int main() {
+    cout << "Jay Ganesh from C++" << endl;
+    return 0;
+}
+`,
+  c: `// C Solution
+#include <stdio.h>
+
+int main() {
+    printf("Jay Ganesh from C\\n");
+    return 0;
+}
+`,
+  java: `// Java Solution
+public class Solution {
+    public static void main(String[] args) {
+        System.out.println("Jay Ganesh from Java");
+    }
+}
+`,
+  javascript: `// JavaScript Solution
+console.log("Jay Ganesh from JS");
+`
+};
+
+const MULTI_LANG_PRESETS = {
+  python: DEMO_PRESETS,
+  cpp: {
+    original: {
+      label: '✨ Original C++',
+      code: `// C++ Binary Search Implementation\n#include <iostream>\n#include <vector>\nusing namespace std;\n\nint binarySearch(const vector<int>& arr, int target) {\n    int left = 0, right = arr.size() - 1;\n    while (left <= right) {\n        int mid = left + (right - left) / 2;\n        if (arr[mid] == target) return mid;\n        if (arr[mid] < target) left = mid + 1;\n        else right = mid - 1;\n    }\n    return -1;\n}\n\nint main() {\n    vector<int> arr = {2, 5, 8, 12, 16, 23, 38, 56, 72, 91};\n    int result = binarySearch(arr, 23);\n    cout << "Element found at index: " << result << endl;\n    return 0;\n}\n`
+    },
+    borderline: {
+      label: '⚠️ Modified C++',
+      code: `// C++ Binary Search - Renamed Variables\n#include <iostream>\n#include <vector>\nusing namespace std;\n\nint findVal(const vector<int>& nums, int key) {\n    int low = 0, high = nums.size() - 1;\n    while (low <= high) {\n        int m = low + (high - low) / 2;\n        if (nums[m] == key) return m;\n        if (nums[m] < key) low = m + 1;\n        else high = m - 1;\n    }\n    return -1;\n}\n\nint main() {\n    vector<int> data = {2, 5, 8, 12, 16, 23, 38, 56, 72, 91};\n    int idx = findVal(data, 23);\n    cout << "Index: " << idx << endl;\n    return 0;\n}\n`
+    },
+    copied: {
+      label: '🚨 Copied C++',
+      code: `// C++ Binary Search Implementation\n#include <iostream>\n#include <vector>\nusing namespace std;\n\nint binarySearch(const vector<int>& arr, int target) {\n    int left = 0, right = arr.size() - 1;\n    while (left <= right) {\n        int mid = left + (right - left) / 2;\n        if (arr[mid] == target) return mid;\n        if (arr[mid] < target) left = mid + 1;\n        else right = mid - 1;\n    }\n    return -1;\n}\n\nint main() {\n    vector<int> arr = {2, 5, 8, 12, 16, 23, 38, 56, 72, 91};\n    int result = binarySearch(arr, 23);\n    cout << "Element found at index: " << result << endl;\n    return 0;\n}\n`
+    }
+  },
+  c: {
+    original: {
+      label: '✨ Original C',
+      code: `// C Binary Search Implementation\n#include <stdio.h>\n\nint binarySearch(int arr[], int n, int target) {\n    int left = 0, right = n - 1;\n    while (left <= right) {\n        int mid = left + (right - left) / 2;\n        if (arr[mid] == target) return mid;\n        if (arr[mid] < target) left = mid + 1;\n        else right = mid - 1;\n    }\n    return -1;\n}\n\nint main() {\n    int arr[] = {2, 5, 8, 12, 16, 23, 38, 56, 72, 91};\n    int n = sizeof(arr) / sizeof(arr[0]);\n    int res = binarySearch(arr, n, 23);\n    printf("Element found at index: %d\\n", res);\n    return 0;\n}\n`
+    },
+    borderline: {
+      label: '⚠️ Modified C',
+      code: `// C Binary Search - Renamed\n#include <stdio.h>\n\nint searchItem(int list[], int len, int val) {\n    int lo = 0, hi = len - 1;\n    while (lo <= hi) {\n        int m = lo + (hi - lo) / 2;\n        if (list[m] == val) return m;\n        if (list[m] < val) lo = m + 1;\n        else hi = m - 1;\n    }\n    return -1;\n}\n\nint main() {\n    int list[] = {2, 5, 8, 12, 16, 23, 38, 56, 72, 91};\n    int ans = searchItem(list, 10, 23);\n    printf("Index: %d\\n", ans);\n    return 0;\n}\n`
+    },
+    copied: {
+      label: '🚨 Copied C',
+      code: `// C Binary Search Implementation\n#include <stdio.h>\n\nint binarySearch(int arr[], int n, int target) {\n    int left = 0, right = n - 1;\n    while (left <= right) {\n        int mid = left + (right - left) / 2;\n        if (arr[mid] == target) return mid;\n        if (arr[mid] < target) left = mid + 1;\n        else right = mid - 1;\n    }\n    return -1;\n}\n\nint main() {\n    int arr[] = {2, 5, 8, 12, 16, 23, 38, 56, 72, 91};\n    int n = sizeof(arr) / sizeof(arr[0]);\n    int res = binarySearch(arr, n, 23);\n    printf("Element found at index: %d\\n", res);\n    return 0;\n}\n`
+    }
+  },
+  java: {
+    original: {
+      label: '✨ Original Java',
+      code: `// Java Binary Search\npublic class Solution {\n    public static int search(int[] arr, int target) {\n        int left = 0, right = arr.length - 1;\n        while (left <= right) {\n            int mid = left + (right - left) / 2;\n            if (arr[mid] == target) return mid;\n            if (arr[mid] < target) left = mid + 1;\n            else right = mid - 1;\n        }\n        return -1;\n    }\n\n    public static void main(String[] args) {\n        int[] arr = {2, 5, 8, 12, 16, 23, 38, 56, 72, 91};\n        int idx = search(arr, 23);\n        System.out.println("Element found at index: " + idx);\n    }\n}\n`
+    },
+    borderline: {
+      label: '⚠️ Modified Java',
+      code: `// Java Binary Search - Renamed\npublic class Solution {\n    public static int find(int[] nums, int key) {\n        int lo = 0, hi = nums.length - 1;\n        while (lo <= hi) {\n            int m = lo + (hi - lo) / 2;\n            if (nums[m] == key) return m;\n            if (nums[m] < key) lo = m + 1;\n            else hi = m - 1;\n        }\n        return -1;\n    }\n\n    public static void main(String[] args) {\n        int[] nums = {2, 5, 8, 12, 16, 23, 38, 56, 72, 91};\n        int ans = find(nums, 23);\n        System.out.println("Index: " + ans);\n    }\n}\n`
+    },
+    copied: {
+      label: '🚨 Copied Java',
+      code: `// Java Binary Search\npublic class Solution {\n    public static int search(int[] arr, int target) {\n        int left = 0, right = arr.length - 1;\n        while (left <= right) {\n            int mid = left + (right - left) / 2;\n            if (arr[mid] == target) return mid;\n            if (arr[mid] < target) left = mid + 1;\n            else right = mid - 1;\n        }\n        return -1;\n    }\n\n    public static void main(String[] args) {\n        int[] arr = {2, 5, 8, 12, 16, 23, 38, 56, 72, 91};\n        int idx = search(arr, 23);\n        System.out.println("Element found at index: " + idx);\n    }\n}\n`
+    }
+  },
+  javascript: {
+    original: {
+      label: '✨ Original JS',
+      code: `// JavaScript Solution\nfunction binarySearch(arr, target) {\n    let left = 0, right = arr.length - 1;\n    while (left <= right) {\n        const mid = Math.floor((left + right) / 2);\n        if (arr[mid] === target) return mid;\n        if (arr[mid] < target) left = mid + 1;\n        else right = mid - 1;\n    }\n    return -1;\n}\n\nconst arr = [2, 5, 8, 12, 16, 23, 38, 56, 72, 91];\nconsole.log("Element found at index:", binarySearch(arr, 23));\n`
+    },
+    borderline: {
+      label: '⚠️ Modified JS',
+      code: `// JavaScript Solution - Renamed\nconst findTarget = (list, key) => {\n    let lo = 0, hi = list.length - 1;\n    while (lo <= hi) {\n        const m = Math.floor((lo + hi) / 2);\n        if (list[m] === key) return m;\n        if (list[m] < key) lo = m + 1;\n        else hi = m - 1;\n    }\n    return -1;\n};\n\nconst nums = [2, 5, 8, 12, 16, 23, 38, 56, 72, 91];\nconsole.log("Index:", findTarget(nums, 23));\n`
+    },
+    copied: {
+      label: '🚨 Copied JS',
+      code: `// JavaScript Solution\nfunction binarySearch(arr, target) {\n    let left = 0, right = arr.length - 1;\n    while (left <= right) {\n        const mid = Math.floor((left + right) / 2);\n        if (arr[mid] === target) return mid;\n        if (arr[mid] < target) left = mid + 1;\n        else right = mid - 1;\n    }\n    return -1;\n}\n\nconst arr = [2, 5, 8, 12, 16, 23, 38, 56, 72, 91];\nconsole.log("Element found at index:", binarySearch(arr, 23));\n`
+    }
+  }
+};
+
 /**
  * Standard Auth Headers Builder
  */
@@ -921,44 +1014,62 @@ export default function StudentPortal({
         
         {/* Editor Toolbar */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-4">
-          <div className="flex items-center space-x-2">
-            <FileCode className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-            <span className="text-xs font-bold text-slate-900 dark:text-white">
-              Your Code Solution ({selectedLanguage.charAt(0).toUpperCase() + selectedLanguage.slice(1)})
-            </span>
-          </div>
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-1.5">
+              <FileCode className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <span className="text-xs font-bold text-slate-900 dark:text-white">
+                Language:
+              </span>
+            </div>
 
-          {selectedAssignment?.languages?.length > 1 && (
+            {/* Language Selector Dropdown - Always visible for any language */}
             <select
               value={selectedLanguage}
-              onChange={(e) => setSelectedLanguage(e.target.value)}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              onChange={(e) => {
+                const newLang = e.target.value;
+                setSelectedLanguage(newLang);
+                setVivaLanguage(newLang);
+                setCode(selectedAssignment?.starterCode?.[newLang] || STARTER_CODES[newLang] || '# Write code here\n');
+              }}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-slate-800 border border-indigo-200 dark:border-slate-700 text-indigo-700 dark:text-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs cursor-pointer"
+              title="Select Programming Language"
             >
-              {selectedAssignment.languages.map(lang => (
-                <option key={lang} value={lang}>{lang.charAt(0).toUpperCase() + lang.slice(1)}</option>
-              ))}
+              <option value="python">🐍 Python (3.12)</option>
+              <option value="cpp">⚡ C++ (G++ 9.2)</option>
+              <option value="c">🔧 C (GCC)</option>
+              <option value="java">☕ Java (OpenJDK)</option>
+              <option value="javascript">🌐 JavaScript (Node.js)</option>
             </select>
-          )}
+          </div>
 
           {/* Quick Demo Buttons for Easy 1-Click Testing */}
           <div className="flex items-center space-x-2">
             <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">Try Demo:</span>
             <button
-              onClick={() => setCode(DEMO_PRESETS.original.code)}
+              onClick={() => {
+                const presets = MULTI_LANG_PRESETS[selectedLanguage] || DEMO_PRESETS;
+                setCode(presets.original.code);
+              }}
               className="text-[11px] px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-semibold transition card-float"
               title="Loads clean, original code"
             >
               Original Code
             </button>
             <button
-              onClick={() => setCode(DEMO_PRESETS.borderline.code)}
+              onClick={() => {
+                const presets = MULTI_LANG_PRESETS[selectedLanguage] || DEMO_PRESETS;
+                setCode(presets.borderline.code);
+              }}
               className="text-[11px] px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-semibold transition card-float"
               title="Loads modified code with renamed variables"
             >
               Borderline Code
             </button>
             <button
-              onClick={() => setCode(DEMO_PRESETS.copied.code)}
+              onClick={() => {
+                const presets = MULTI_LANG_PRESETS[selectedLanguage] || DEMO_PRESETS;
+                setCode(presets.copied.code);
+              }}
               className="text-[11px] px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-semibold transition card-float"
               title="Loads exact copied code"
             >
