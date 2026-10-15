@@ -6,6 +6,7 @@ import {
   FileCode, 
   ArrowRight, 
   Sparkles, 
+  AlertCircle,
   AlertTriangle, 
   XCircle,
   Award,
