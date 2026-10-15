@@ -200,25 +200,18 @@ function generateOtp() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// Nodemailer Singleton Pooled Transporter
-let sharedTransporter = null;
+// Nodemailer Direct SSL Transporter (smtp.gmail.com:465)
 function getMailTransporter() {
-  if (sharedTransporter) return sharedTransporter;
   const user = process.env.GMAIL_USER || process.env.SMTP_USER || 'dhumaljai@gmail.com';
   const pass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || 'wuvdglecxgeizggx';
 
   if (user && pass) {
-    sharedTransporter = nodemailer.createTransport({
-      service: 'gmail',
-      pool: true,
-      maxConnections: 3,
-      maxMessages: 100,
-      auth: { user, pass },
-      connectionTimeout: 10000,
-      greetingTimeout: 8000,
-      socketTimeout: 12000
+    return nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: { user, pass }
     });
-    return sharedTransporter;
   }
   return null;
 }
@@ -284,8 +277,6 @@ async function sendRealEmailOtp(toEmail, otpCode, role) {
     return true;
   } catch (err) {
     console.error(`❌ [MAIL ERROR] Failed to send email to ${toEmail}:`, err.message);
-    // Invalidate shared transporter on error so next call rebuilds clean connection
-    sharedTransporter = null;
     return false;
   }
 }
