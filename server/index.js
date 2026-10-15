@@ -224,10 +224,14 @@ function generateOtp() {
 }
 
 // Nodemailer SMTP Transporter: supports standard SMTP_* and backward-compatible GMAIL_*
+let cachedTransporter = null;
+
 function getMailTransporter() {
   if (process.env.NODE_ENV === 'test') {
     return nodemailer.createTransport({ jsonTransport: true });
   }
+
+  if (cachedTransporter) return cachedTransporter;
 
   const host = process.env.SMTP_HOST || 'smtp.gmail.com';
   const port = parseInt(process.env.SMTP_PORT || '465', 10);
@@ -238,15 +242,19 @@ function getMailTransporter() {
   const pass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD;
 
   if (user && pass) {
-    return nodemailer.createTransport({
+    cachedTransporter = nodemailer.createTransport({
       host,
       port,
       secure,
       auth: { user, pass },
-      connectionTimeout: 5000,
-      greetingTimeout: 5000,
-      socketTimeout: 8000
+      pool: true,
+      maxConnections: 5,
+      maxMessages: 100,
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000
     });
+    return cachedTransporter;
   }
   return null;
 }
@@ -369,12 +377,12 @@ app.post('/api/auth/send-otp', async (req, res) => {
     const emailOtp = generateOtp();
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
 
-    // Attempt real email dispatch with timeout race
+    // Attempt real email dispatch with timeout race (15s allows for initial SSL handshake)
     let mailSent = false;
     try {
       mailSent = await Promise.race([
         sendRealEmailOtp(cleanEmail, emailOtp, role),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('SMTP connection timed out')), 7000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('SMTP connection timed out')), 15000))
       ]);
     } catch (e) {
       console.warn(`⚠️ [MAIL DISPATCH NOTICE] ${cleanEmail}: ${e.message}`);
