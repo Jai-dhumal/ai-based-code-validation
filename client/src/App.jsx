@@ -110,10 +110,6 @@ export default function App() {
       if (authToken) {
         localStorage.setItem('ai_validate_token', authToken);
       }
-      // Force light theme
-      localStorage.setItem('ai_validate_theme', 'light');
-      setIsDark(false);
-      document.documentElement.classList.remove('dark');
     } catch (e) {}
     fetchData();
   };

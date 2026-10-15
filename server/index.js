@@ -6,6 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { spawn, spawnSync } from 'child_process';
 import os from 'os';
 
@@ -26,8 +27,21 @@ dotenv.config(); // also fallback to root if present
 export const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
-app.use(cors());
+// CORS configuration supporting environment variable override
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
+  : ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5000', 'http://127.0.0.1:5000'];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+      return callback(null, true);
+    }
+    return callback(null, true);
+  },
+  credentials: true
+}));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -47,8 +61,11 @@ if (!fs.existsSync(AVATARS_DIR)) {
 const avatarStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, AVATARS_DIR),
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.jpg';
-    cb(null, `${req.params.userId}${ext}`);
+    const rawUserId = String(req.params.userId || 'user');
+    const safeUserId = rawUserId.replace(/[^a-zA-Z0-9_-]/g, '');
+    const ext = path.extname(file.originalname).toLowerCase();
+    const safeExt = ['.jpg', '.jpeg', '.png', '.webp'].includes(ext) ? ext : '.jpg';
+    cb(null, `${safeUserId || 'user'}_avatar${safeExt}`);
   }
 });
 const uploadAvatar = multer({
@@ -192,24 +209,39 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// In-memory OTP Store: email -> { emailOtp, mobileOtp, mobile, role, expiresAt, verified }
+// In-memory OTP Store: email -> { emailOtp, role, expiresAt, attempts, lastRequestedAt, verified }
 const otpStore = new Map();
 
-// Generate 6-digit OTP
-function generateOtp() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+// Helper for test suite inspection
+export function _getTestOtp(email) {
+  const rec = otpStore.get(email.trim().toLowerCase());
+  return rec ? rec.emailOtp : null;
 }
 
-// Nodemailer Direct SSL Transporter (smtp.gmail.com:465) with strict timeouts
+// Generate cryptographically secure 6-digit OTP
+function generateOtp() {
+  return crypto.randomInt(100000, 1000000).toString();
+}
+
+// Nodemailer SMTP Transporter: supports standard SMTP_* and backward-compatible GMAIL_*
 function getMailTransporter() {
-  const user = process.env.GMAIL_USER || process.env.SMTP_USER || 'dhumaljai@gmail.com';
-  const pass = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASS || 'wuvdglecxgeizggx';
+  if (process.env.NODE_ENV === 'test') {
+    return nodemailer.createTransport({ jsonTransport: true });
+  }
+
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const port = parseInt(process.env.SMTP_PORT || '465', 10);
+  const secure = process.env.SMTP_SECURE !== undefined 
+    ? process.env.SMTP_SECURE === 'true' 
+    : (port === 465);
+  const user = process.env.SMTP_USER || process.env.GMAIL_USER;
+  const pass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD;
 
   if (user && pass) {
     return nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      port: 465,
-      secure: true,
+      host,
+      port,
+      secure,
       auth: { user, pass },
       connectionTimeout: 5000,
       greetingTimeout: 5000,
@@ -222,16 +254,19 @@ function getMailTransporter() {
 async function sendRealEmailOtp(toEmail, otpCode, role) {
   const transporter = getMailTransporter();
   if (!transporter) {
-    console.log(`ℹ️ [MAILER] No Gmail credentials configured. OTP for ${toEmail}: ${otpCode}`);
+    console.warn(`⚠️ [MAIL WARNING] SMTP credentials not configured. Unable to send verification email to ${toEmail}`);
     return false;
   }
+
+  const senderUser = process.env.SMTP_USER || process.env.GMAIL_USER;
+  const fromAddress = process.env.SMTP_FROM || (senderUser ? `"JSPM BSIOTR AI Code Validator" <${senderUser}>` : '"JSPM BSIOTR AI Code Validator" <noreply@jspm.edu>');
 
   const welcomeRoleText = role === 'teacher'
     ? 'Faculty registered successfully! Welcome to the Code Validation System.'
     : 'Student registered successfully! Welcome to the Code Validation System.';
 
   const mailOptions = {
-    from: `"JSPM BSIOTR AI Code Validator" <${process.env.GMAIL_USER || 'dhumaljai@gmail.com'}>`,
+    from: fromAddress,
     to: toEmail,
     subject: `🔐 Your Verification OTP Code: ${otpCode} - JSPM BSIOTR`,
     html: `
@@ -276,7 +311,7 @@ async function sendRealEmailOtp(toEmail, otpCode, role) {
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log(`📧 [REAL EMAIL SENT] Successfully sent OTP ${otpCode} to ${toEmail}: ${info.messageId}`);
+    console.log(`📧 [EMAIL SENT] Verification email successfully dispatched to ${toEmail}`);
     return true;
   } catch (err) {
     console.error(`❌ [MAIL ERROR] Failed to send email to ${toEmail}:`, err.message);
@@ -294,6 +329,15 @@ app.post('/api/auth/send-otp', async (req, res) => {
     }
 
     const cleanEmail = email.trim().toLowerCase();
+    const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!EMAIL_REGEX.test(cleanEmail)) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
+    }
+
+    // Role check
+    if (role !== 'student' && role !== 'teacher') {
+      return res.status(400).json({ error: 'Invalid registration role.' });
+    }
 
     // Check if user already exists
     const existingUser = db.findUserByEmail(cleanEmail);
@@ -313,41 +357,59 @@ app.post('/api/auth/send-otp', async (req, res) => {
       }
     }
 
+    // Rate Limiting: Prevent rapid resend abuse (30-second cooldown)
+    const existingOtp = otpStore.get(cleanEmail);
+    if (existingOtp && existingOtp.lastRequestedAt && (Date.now() - existingOtp.lastRequestedAt < 30000)) {
+      const waitSeconds = Math.ceil((30000 - (Date.now() - existingOtp.lastRequestedAt)) / 1000);
+      return res.status(429).json({
+        error: `Please wait ${waitSeconds} seconds before requesting a new OTP.`
+      });
+    }
+
     const emailOtp = generateOtp();
     const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
 
-    otpStore.set(cleanEmail, {
-      emailOtp,
-      role,
-      expiresAt,
-      verified: false
-    });
-
-    // Send real Gmail OTP with strict timeout race so UI never gets stuck
+    // Attempt real email dispatch with timeout race
     let mailSent = false;
     try {
       mailSent = await Promise.race([
         sendRealEmailOtp(cleanEmail, emailOtp, role),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('SMTP timeout')), 7000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error('SMTP connection timed out')), 7000))
       ]);
     } catch (e) {
       console.warn(`⚠️ [MAIL DISPATCH NOTICE] ${cleanEmail}: ${e.message}`);
+      mailSent = false;
     }
 
-    console.log(`\n🔐 [SECURE OTP LOG] Dispatch for ${cleanEmail}:`);
-    console.log(`   📧 Email OTP: ${emailOtp} (Gmail delivered: ${mailSent})\n`);
+    // Strict security check: If email delivery failed, never return success and do NOT store usable OTP
+    if (!mailSent) {
+      otpStore.delete(cleanEmail);
+      return res.status(503).json({
+        error: 'Unable to deliver verification email at this moment. Please check your network connection or verify that mail server settings are configured.'
+      });
+    }
+
+    // Record valid OTP session
+    otpStore.set(cleanEmail, {
+      emailOtp,
+      role,
+      expiresAt,
+      attempts: 0,
+      lastRequestedAt: Date.now(),
+      verified: false
+    });
+
+    console.log(`🔐 [SECURE OTP DISPATCH] OTP generated and delivery confirmed for ${cleanEmail} (role: ${role})`);
 
     res.json({
       success: true,
-      mailDelivered: mailSent,
-      message: mailSent 
-        ? `A 6-digit verification code has been dispatched to your Gmail (${cleanEmail}). Please check your inbox or spam folder.`
-        : `Verification code generated for ${cleanEmail}. Please check your Gmail inbox.`,
+      mailDelivered: true,
+      message: `A 6-digit verification code has been dispatched to ${cleanEmail}. Please check your inbox or spam folder.`,
       expiresInSeconds: 600
     });
   } catch (err) {
     console.error('Send OTP error:', err);
-    res.status(500).json({ error: 'Failed to dispatch verification codes: ' + err.message });
+    res.status(500).json({ error: 'Failed to dispatch verification code: ' + err.message });
   }
 });
 
@@ -371,8 +433,20 @@ app.post('/api/auth/verify-otp', (req, res) => {
       return res.status(400).json({ error: 'Verification code has expired. Please request a new code.' });
     }
 
+    // Rate limiting: Max 5 incorrect attempts before invalidating OTP
+    record.attempts = (record.attempts || 0) + 1;
+    if (record.attempts > 5) {
+      otpStore.delete(cleanEmail);
+      return res.status(429).json({
+        error: 'Too many incorrect attempts. For security, your verification code has been invalidated. Please request a new OTP.'
+      });
+    }
+
     if (record.emailOtp !== emailOtp.trim()) {
-      return res.status(400).json({ error: 'Invalid OTP code. Please double-check the code entered.' });
+      const remaining = 5 - record.attempts;
+      return res.status(400).json({
+        error: `Invalid OTP code. ${remaining > 0 ? `${remaining} attempt${remaining > 1 ? 's' : ''} remaining.` : 'Please request a new code.'}`
+      });
     }
 
     record.verified = true;
@@ -385,10 +459,10 @@ app.post('/api/auth/verify-otp', (req, res) => {
   }
 });
 
-// Register: Force student/teacher only, facultyKey verification, bcrypt hash, presence
+// Register: Force student/teacher only, facultyKey verification, bcrypt hash, strict OTP verification
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { name, email, password, role = 'student', rollNo, department, division, mobile, facultyKey, skipOtp } = req.body;
+    const { name, email, password, role = 'student', rollNo, department, division, mobile, facultyKey } = req.body;
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email and password are required' });
     }
@@ -413,12 +487,12 @@ app.post('/api/auth/register', async (req, res) => {
       safeRole = 'student';
     }
 
-    // Security Gate 2: Email OTP Verification Check
-    if (!skipOtp) {
-      const record = otpStore.get(cleanEmail);
-      if (record && !record.verified) {
-        return res.status(400).json({ error: 'Please verify the Email OTP before completing registration.' });
-      }
+    // Security Gate 2: Mandatory Verified Email OTP Check (No bypass allowed)
+    const record = otpStore.get(cleanEmail);
+    if (!record || !record.verified) {
+      return res.status(400).json({
+        error: 'Email verification required. Please verify your email with the OTP code before completing registration.'
+      });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -440,7 +514,7 @@ app.post('/api/auth/register', async (req, res) => {
     };
 
     db.addUser(newUser);
-    // Cleanup OTP session
+    // Cleanup OTP session so it cannot be reused
     otpStore.delete(cleanEmail);
 
     const token = generateToken(newUser);

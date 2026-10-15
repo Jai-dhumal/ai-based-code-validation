@@ -232,14 +232,14 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-center py-10 px-4 sm:px-6 lg:px-8 font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-center py-10 px-4 sm:px-6 lg:px-8 font-['Plus_Jakarta_Sans',sans-serif] transition-colors">
       
       {/* Top Header Theme & Status Toggle */}
       {onToggleTheme && (
         <div className="absolute top-5 right-6 flex items-center gap-2">
           <button
             onClick={onToggleTheme}
-            className="p-2.5 rounded-2xl bg-white border border-slate-200 text-slate-600 hover:text-indigo-600 shadow-sm transition"
+            className="p-2.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 shadow-sm transition"
             title="Toggle Theme"
           >
             {isDark ? <Sun className="w-5 h-5 text-amber-500" /> : <Moon className="w-5 h-5 text-indigo-600" />}
@@ -252,30 +252,30 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
         <div className="inline-flex items-center justify-center p-3.5 rounded-3xl bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 mb-3">
           <BookOpen className="w-8 h-8" />
         </div>
-        <div className="text-xs font-black uppercase tracking-wider text-indigo-600 mb-1">
+        <div className="text-xs font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-1">
           JSPM BSIOTR Wagholi, Pune
         </div>
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
           AI Code Validator 2.0
         </h1>
-        <p className="mt-2 text-sm text-slate-600 font-medium max-w-md mx-auto">
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 font-medium max-w-md mx-auto">
           Intelligent Two-Tier Plagiarism Analysis, Online Compiler &amp; Academic Integrity Platform
         </p>
       </div>
 
       {/* Main Elegant Card Container */}
       <div className="sm:mx-auto sm:w-full sm:max-w-xl">
-        <div className="bg-white border border-slate-200/90 rounded-3xl p-8 sm:p-10 shadow-xl shadow-slate-200/70 backdrop-blur-xl">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-8 sm:p-10 shadow-xl shadow-slate-200/70 dark:shadow-none backdrop-blur-xl transition-colors">
           
           {/* Top Mode Switcher (Sign In vs Sign Up) */}
-          <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-6">
+          <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl mb-6">
             <button
               type="button"
               onClick={() => { setAuthMode('signin'); setOtpStep(false); setErrorMsg(''); setSuccessMsg(''); }}
               className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
                 authMode === 'signin'
-                  ? 'bg-white text-indigo-600 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               Sign In
@@ -291,8 +291,8 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
               }}
               className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
                 authMode === 'signup'
-                  ? 'bg-white text-indigo-600 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               Create Account
@@ -301,7 +301,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
 
           {/* Role Selector Pill Tabs */}
           <div className="mb-6">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2.5">
               Select Your Portal Role
             </label>
             <div className={`grid ${authMode === 'signup' ? 'grid-cols-2' : 'grid-cols-3'} gap-2.5`}>
@@ -311,8 +311,8 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                 onClick={() => setRole('student')}
                 className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all ${
                   role === 'student'
-                    ? 'border-indigo-600 bg-indigo-50/70 text-indigo-700 font-bold shadow-sm'
-                    : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'
+                    ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold shadow-sm'
+                    : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/50 dark:hover:bg-slate-800/50'
                 }`}
               >
                 <GraduationCap className="w-5 h-5 mb-1" />
@@ -325,8 +325,8 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                 onClick={() => setRole('teacher')}
                 className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all ${
                   role === 'teacher'
-                    ? 'border-indigo-600 bg-indigo-50/70 text-indigo-700 font-bold shadow-sm'
-                    : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'
+                    ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold shadow-sm'
+                    : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/50 dark:hover:bg-slate-800/50'
                 }`}
               >
                 <UserCheck className="w-5 h-5 mb-1" />
@@ -340,8 +340,8 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                   onClick={() => setRole('admin')}
                   className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all ${
                     role === 'admin'
-                      ? 'border-indigo-600 bg-indigo-50/70 text-indigo-700 font-bold shadow-sm'
-                      : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'
+                      ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold shadow-sm'
+                      : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/50 dark:hover:bg-slate-800/50'
                   }`}
                 >
                   <ShieldAlert className="w-5 h-5 mb-1" />
@@ -351,17 +351,16 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
             </div>
           </div>
 
-
           {/* Alert Messages */}
           {errorMsg && (
-            <div className="mb-4 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-start space-x-2">
+            <div className="mb-4 p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300 text-xs font-semibold flex items-start space-x-2">
               <span className="shrink-0 mt-0.5">⚠️</span>
               <span>{errorMsg}</span>
             </div>
           )}
 
           {successMsg && (
-            <div className="mb-4 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold flex items-start space-x-2">
+            <div className="mb-4 p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 text-xs font-semibold flex items-start space-x-2">
               <span className="shrink-0 mt-0.5">✓</span>
               <span>{successMsg}</span>
             </div>
@@ -371,7 +370,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
           {authMode === 'signin' && (
             <form onSubmit={handleSignIn} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                   Institutional Email
                 </label>
                 <div className="relative">
@@ -385,13 +384,13 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                     }
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-3.5 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
+                    className="w-full pl-10 pr-3.5 py-3 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 focus:border-indigo-600 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-xs focus:outline-none transition font-medium"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                   Password
                 </label>
                 <div className="relative">
@@ -402,7 +401,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-3.5 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
+                    className="w-full pl-10 pr-3.5 py-3 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 focus:border-indigo-600 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-xs focus:outline-none transition font-medium"
                   />
                 </div>
               </div>
@@ -422,7 +421,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
           {authMode === 'signup' && !otpStep && (
             <form onSubmit={handleRequestOtp} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                   Full Name
                 </label>
                 <div className="relative">
@@ -433,13 +432,13 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                     placeholder="e.g. Rahul Sharma"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full pl-10 pr-3.5 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
+                    className="w-full pl-10 pr-3.5 py-3 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 focus:border-indigo-600 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-xs focus:outline-none transition font-medium"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                   Gmail / Institutional Email (for Verification OTP)
                 </label>
                 <div className="relative">
@@ -450,17 +449,17 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                     placeholder="yourname@gmail.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-3.5 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
+                    className="w-full pl-10 pr-3.5 py-3 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 focus:border-indigo-600 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-xs focus:outline-none transition font-medium"
                   />
                 </div>
               </div>
 
               {/* Faculty Authorization Key (Required only for Teachers) */}
               {role === 'teacher' && (
-                <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200">
+                <div className="p-4 rounded-2xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60">
                   <div className="flex items-center gap-1.5 mb-1.5">
                     <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
-                    <label className="text-xs font-bold text-amber-900">
+                    <label className="text-xs font-bold text-amber-900 dark:text-amber-300">
                       Faculty Authorization Key (Mandatory)
                     </label>
                   </div>
@@ -472,10 +471,10 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                       placeholder="Enter Institutional Faculty Key"
                       value={facultyKey}
                       onChange={(e) => setFacultyKey(e.target.value)}
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-white border border-amber-300 focus:border-amber-500 rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 focus:border-amber-500 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
                     />
                   </div>
-                  <p className="text-[11px] text-amber-700 mt-1.5">
+                  <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1.5">
                     Security Gate: Only authorized faculty with the institutional key can create teacher accounts.
                   </p>
                 </div>
@@ -485,7 +484,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                 <>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                         Roll Number
                       </label>
                       <div className="relative">
@@ -496,13 +495,13 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                           placeholder="CE2025-05"
                           value={rollNo}
                           onChange={(e) => setRollNo(e.target.value)}
-                          className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
+                          className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 focus:border-indigo-600 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                         Division
                       </label>
                       <div className="relative">
@@ -510,7 +509,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                         <select
                           value={division}
                           onChange={(e) => setDivision(e.target.value)}
-                          className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
+                          className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 focus:border-indigo-600 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
                         >
                           <option value="A">Division A</option>
                           <option value="B">Division B</option>
@@ -523,7 +522,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
               )}
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                   Department
                 </label>
                 <div className="relative">
@@ -532,7 +531,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                     <select
                       value={department}
                       onChange={(e) => setDepartment(e.target.value)}
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 focus:border-indigo-600 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
                     >
                       {departments.map((dept, idx) => {
                         const deptVal = typeof dept === 'string' ? dept : (dept.name || dept.departmentName || `Dept ${idx + 1}`);
@@ -549,7 +548,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                       value={department}
                       onChange={(e) => setDepartment(e.target.value)}
                       placeholder="e.g. Computer Engineering"
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
+                      className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 focus:border-indigo-600 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
                     />
                   )}
                 </div>
@@ -557,7 +556,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                     Password
                   </label>
                   <input
@@ -566,12 +565,12 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                     placeholder="Create password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 focus:border-indigo-600 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                     Confirm Password
                   </label>
                   <input
@@ -580,7 +579,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                     placeholder="Re-enter password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-xs focus:outline-none transition font-medium"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 focus:border-indigo-600 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none transition font-medium"
                   />
                 </div>
               </div>
@@ -599,41 +598,41 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
           {/* VIEW 3: EMAIL OTP VERIFICATION STEP */}
           {authMode === 'signup' && otpStep && (
             <form onSubmit={handleVerifyOtpAndRegister} className="space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setOtpStep(false)}
-                  className="flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-900 transition"
+                  className="flex items-center gap-1 text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   <span>Back to details</span>
                 </button>
-                <div className="text-xs font-bold text-indigo-600">
+                <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
                   Step 2 of 2: Gmail Verification
                 </div>
               </div>
 
               <div className="text-center py-2">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-200 mx-auto flex items-center justify-center text-indigo-600 mb-2">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 mx-auto flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-2">
                   <ShieldCheck className="w-6 h-6" />
                 </div>
-                <h3 className="font-extrabold text-base text-slate-900">
+                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
                   Enter 6-Digit Gmail OTP
                 </h3>
-                <p className="text-xs text-slate-600 mt-1">
-                  We sent a 6-digit verification code to <strong>{email}</strong>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                  We sent a 6-digit verification code to <strong className="text-slate-800 dark:text-slate-200">{email}</strong>
                 </p>
-                <div className="text-xs font-mono font-bold text-indigo-600 mt-1">
+                <div className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 mt-1">
                   Code expires in: {formatTimer(otpTimer)}
                 </div>
               </div>
 
               {/* Security Delivery Notice */}
-              <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200 text-xs text-indigo-900 flex items-start gap-2.5">
-                <Mail className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+              <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-xs text-indigo-900 dark:text-indigo-200 flex items-start gap-2.5">
+                <Mail className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
                 <div className="space-y-0.5">
                   <p className="font-bold">Confidential Verification Code Dispatched</p>
-                  <p className="text-[11px] text-slate-600">
+                  <p className="text-[11px] text-slate-600 dark:text-slate-300">
                     Your 6-digit OTP has been sent securely to <strong>{email}</strong>. Please check your Gmail inbox (and Spam/Updates folder) to enter the code.
                   </p>
                 </div>
@@ -641,7 +640,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
 
               {/* Email OTP Input */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                   Enter 6-Digit Email OTP
                 </label>
                 <div className="relative">
@@ -653,7 +652,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                     placeholder="Enter 6-digit code"
                     value={emailOtp}
                     onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, ''))}
-                    className="w-full pl-10 pr-3.5 py-3 bg-slate-50 border border-slate-200 focus:border-indigo-600 focus:bg-white rounded-xl text-slate-900 text-base focus:outline-none transition font-mono font-bold tracking-widest text-center"
+                    className="w-full pl-10 pr-3.5 py-3 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 focus:border-indigo-600 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl text-slate-900 dark:text-white text-base focus:outline-none transition font-mono font-bold tracking-widest text-center"
                   />
                 </div>
               </div>
@@ -672,7 +671,7 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                   type="button"
                   onClick={handleRequestOtp}
                   disabled={isLoading || otpTimer > 540}
-                  className="text-xs text-indigo-600 font-bold hover:underline disabled:opacity-50 disabled:no-underline inline-flex items-center gap-1"
+                  className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline disabled:opacity-50 disabled:no-underline inline-flex items-center gap-1"
                 >
                   <RefreshCw className="w-3 h-3" />
                   <span>Resend Verification Code</span>

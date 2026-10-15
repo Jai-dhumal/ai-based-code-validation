@@ -1,4 +1,6 @@
-import { app } from './index.js';
+process.env.NODE_ENV = 'test';
+
+import { app, _getTestOtp } from './index.js';
 import http from 'http';
 
 function assert(condition, message) {
@@ -29,7 +31,7 @@ async function runSecurityOtpTests() {
         name: 'Sneaky Student',
         email: `fake_teacher_${Date.now()}@jspm.edu`,
         password: 'password123',
-        role: 'teacher' // Trying to become teacher without key
+        role: 'teacher'
       })
     });
     assert(fakeTeacherRes.status === 403, 'Unauthorized teacher registration without facultyKey is blocked (403)');
@@ -48,67 +50,114 @@ async function runSecurityOtpTests() {
     });
     assert(wrongKeyRes.status === 403, 'Teacher registration with invalid facultyKey is blocked (403)');
 
-    // 3. Dual OTP Dispatch
-    console.log('\n--- 2. Dual OTP Generation & Verification ---');
-    const testEmail = `newuser_${Date.now()}@jspm.edu`;
-    const testMobile = '9876543210';
+    // 3. Registration bypass prevention: Registration without OTP record
+    console.log('\n--- 2. Registration Security & OTP Gate Enforcement ---');
+    const bypassRes = await fetch(`${baseUrl}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Unverified User',
+        email: `unverified_${Date.now()}@jspm.edu`,
+        password: 'password123',
+        role: 'student',
+        skipOtp: true // Malicious attempt to bypass
+      })
+    });
+    assert(bypassRes.status === 400, 'Registration without verified OTP is strictly blocked (400)');
 
+    // 4. Invalid email format in send-otp
+    const badEmailRes = await fetch(`${baseUrl}/api/auth/send-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'not-an-email',
+        role: 'student'
+      })
+    });
+    assert(badEmailRes.status === 400, 'Invalid email format rejected by send-otp (400)');
+
+    // 5. Valid OTP Dispatch
+    const testEmail = `verified_user_${Date.now()}@jspm.edu`;
     const sendOtpRes = await fetch(`${baseUrl}/api/auth/send-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: testEmail,
-        mobile: testMobile,
         role: 'student'
       })
     });
     const sendOtpData = await sendOtpRes.json();
     assert(sendOtpRes.status === 200, 'OTP dispatch endpoint responds with 200 OK');
-    assert(Boolean(sendOtpData.simulation?.emailOtp), 'Generates 6-digit Email OTP');
-    assert(Boolean(sendOtpData.simulation?.mobileOtp), 'Generates 6-digit Mobile OTP');
+    assert(sendOtpData.mailDelivered === true, 'mailDelivered confirmed in response');
 
-    // 4. Verify OTP with wrong code
+    // 6. Rate Limiting: Resending OTP within 30s is throttled
+    const rapidResendRes = await fetch(`${baseUrl}/api/auth/send-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: testEmail,
+        role: 'student'
+      })
+    });
+    assert(rapidResendRes.status === 429, 'Rapid OTP resend within 30s is rate-limited (429)');
+
+    // 7. Verification with wrong code
     const wrongOtpRes = await fetch(`${baseUrl}/api/auth/verify-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: testEmail,
-        emailOtp: '000000',
-        mobileOtp: '000000'
+        emailOtp: '000000'
       })
     });
-    assert(wrongOtpRes.status === 400, 'Invalid OTP codes are properly rejected (400)');
+    assert(wrongOtpRes.status === 400, 'Incorrect OTP code is rejected (400)');
 
-    // 5. Verify OTP with correct simulated codes
+    // 8. Retrieve test OTP and verify successfully
+    const otpCode = _getTestOtp(testEmail);
+    assert(Boolean(otpCode && otpCode.length === 6), 'Cryptographically secure 6-digit OTP generated');
+
     const correctOtpRes = await fetch(`${baseUrl}/api/auth/verify-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: testEmail,
-        emailOtp: sendOtpData.simulation.emailOtp,
-        mobileOtp: sendOtpData.simulation.mobileOtp
+        emailOtp: otpCode
       })
     });
-    assert(correctOtpRes.status === 200, 'Valid Email & Mobile OTPs successfully verified (200 OK)');
+    assert(correctOtpRes.status === 200, 'Valid Email OTP successfully verified (200 OK)');
 
-    // 6. Complete registration after OTP verification
+    // 9. Complete registration with verified OTP
     const completeRegRes = await fetch(`${baseUrl}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: 'Verified Student',
         email: testEmail,
-        mobile: testMobile,
         password: 'password123',
         role: 'student',
-        department: 'Computer Engineering'
+        department: 'Computer Engineering',
+        division: 'A',
+        rollNo: 'CE2025-99'
       })
     });
     const completeRegData = await completeRegRes.json();
     assert(completeRegRes.status === 201, 'Registration completes successfully after OTP verification (201)');
     assert(Boolean(completeRegData.token), 'Registration returns valid JWT session token');
 
-    // 7. Live Code Plagiarism / Authenticity Detection on any code
+    // 10. OTP reuse prevention: verify that OTP record was deleted upon registration
+    const reuseRegRes = await fetch(`${baseUrl}/api/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Verified Student 2',
+        email: testEmail,
+        password: 'password123',
+        role: 'student'
+      })
+    });
+    assert(reuseRegRes.status === 400, 'OTP reuse is strictly prevented (400)');
+
+    // 11. Live Code Plagiarism / Authenticity Detection
     console.log('\n--- 3. Real-Time Code Authenticity & Similarity Detection ---');
     const token = completeRegData.token;
 
@@ -153,6 +202,8 @@ class BST:
     console.log('\n========================================================');
     console.log('📊 SECURITY, OTP & CODE ANALYSIS: ALL TESTS PASSED ✅');
     console.log('========================================================\n');
+    server.close();
+    process.exit(0);
   } finally {
     server.close();
   }

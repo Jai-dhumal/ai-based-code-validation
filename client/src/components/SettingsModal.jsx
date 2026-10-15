@@ -33,23 +33,23 @@ export default function SettingsModal({ isOpen, onClose, currentSettings, onSave
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in">
-      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-slate-950/85 backdrop-blur-md animate-in fade-in">
+      <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-3xl shadow-2xl overflow-hidden transition-colors">
         
         {/* Header */}
-        <div className="px-6 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+        <div className="px-6 py-4 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
-            <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">
+            <div className="p-2 rounded-xl bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400">
               <Settings className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-white">System & AI Settings</h3>
-              <p className="text-xs text-slate-400">Configure Gemini API Key & Validation Thresholds</p>
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white">System & AI Settings</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Configure Gemini API Key & Validation Thresholds</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition"
           >
             <X className="w-5 h-5" />
           </button>
@@ -60,15 +60,15 @@ export default function SettingsModal({ isOpen, onClose, currentSettings, onSave
           
           {/* Gemini API Key */}
           <div className="space-y-1.5">
-            <label className="font-semibold text-slate-300 flex items-center justify-between">
+            <label className="font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <Key className="w-3.5 h-3.5 text-indigo-400" />
+                <Key className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                 Google Gemini API Key
               </span>
               {currentSettings?.geminiApiKeyConfigured ? (
-                <span className="text-[10px] text-emerald-400 font-mono">Configured ({currentSettings.geminiKeyPreview})</span>
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono">Configured ({currentSettings.geminiKeyPreview})</span>
               ) : (
-                <span className="text-[10px] text-amber-400 font-mono">Offline Mode Active</span>
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono">Offline Mode Active</span>
               )}
             </label>
             <input
@@ -76,25 +76,25 @@ export default function SettingsModal({ isOpen, onClose, currentSettings, onSave
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="AIzaSy... (leave blank to keep current or use offline simulator)"
-              className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-slate-200 text-xs focus:outline-none transition"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-slate-800 dark:text-slate-200 text-xs focus:outline-none transition"
             />
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
               Optional: If left blank, the platform runs in an intelligent built-in semantic & dynamic quiz simulation mode.
             </p>
           </div>
 
           {/* Threshold Sliders */}
-          <div className="pt-3 border-t border-slate-800 space-y-4">
-            <h4 className="font-semibold text-slate-300 flex items-center gap-1.5">
-              <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+          <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-4">
+            <h4 className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <Sliders className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
               Two-Tier Detection Thresholds
             </h4>
 
             {/* Low Threshold */}
             <div>
-              <div className="flex justify-between text-slate-400 mb-1">
+              <div className="flex justify-between text-slate-600 dark:text-slate-400 mb-1">
                 <span>Tier-1 Clean Threshold (Below this = Direct Pass)</span>
-                <span className="text-emerald-400 font-bold">{lowThreshold}%</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">{lowThreshold}%</span>
               </div>
               <input
                 type="range"
@@ -108,9 +108,9 @@ export default function SettingsModal({ isOpen, onClose, currentSettings, onSave
 
             {/* High Threshold */}
             <div>
-              <div className="flex justify-between text-slate-400 mb-1">
+              <div className="flex justify-between text-slate-600 dark:text-slate-400 mb-1">
                 <span>Tier-1 Borderline Threshold (Above this = High Plagiarism)</span>
-                <span className="text-rose-400 font-bold">{highThreshold}%</span>
+                <span className="text-rose-600 dark:text-rose-400 font-bold">{highThreshold}%</span>
               </div>
               <input
                 type="range"
@@ -120,16 +120,16 @@ export default function SettingsModal({ isOpen, onClose, currentSettings, onSave
                 onChange={(e) => setHighThreshold(e.target.value)}
                 className="w-full accent-rose-500 cursor-pointer"
               />
-              <span className="text-[10px] text-amber-400/80 block mt-1">
+              <span className="text-[10px] text-amber-600 dark:text-amber-400/80 block mt-1">
                 Submissions between {lowThreshold}% and {highThreshold}% automatically trigger Tier-2 Gemini AI Semantic Check.
               </span>
             </div>
 
             {/* Min Quiz Score */}
             <div>
-              <div className="flex justify-between text-slate-400 mb-1">
+              <div className="flex justify-between text-slate-600 dark:text-slate-400 mb-1">
                 <span>Minimum Quiz Pass Mark for GitHub Unlock</span>
-                <span className="text-indigo-400 font-bold">{minQuizScore}%</span>
+                <span className="text-indigo-600 dark:text-indigo-400 font-bold">{minQuizScore}%</span>
               </div>
               <input
                 type="range"
@@ -146,10 +146,10 @@ export default function SettingsModal({ isOpen, onClose, currentSettings, onSave
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-slate-950 border-t border-slate-800 flex items-center justify-end space-x-3">
+        <div className="px-6 py-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end space-x-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs text-slate-400 hover:text-white transition"
+            className="px-4 py-2 rounded-xl text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition"
           >
             Cancel
           </button>

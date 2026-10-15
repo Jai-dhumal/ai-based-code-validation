@@ -1,7 +1,7 @@
 // E2E HTTP API Testing Suite
 // Tests all endpoints against live HTTP server
 import http from 'http';
-import { app } from './index.js';
+import { app, _getTestOtp } from './index.js';
 
 let server;
 let baseUrl;
@@ -74,12 +74,27 @@ async function runTests() {
     const teacherToken = teacherLoginData.token;
 
     // Registration privilege escalation attempt
+    const hackerEmail = `hacker_${Date.now()}@jspm.edu`;
+    await fetch(`${baseUrl}/api/auth/send-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: hackerEmail, role: 'student' })
+    });
+    const hackerOtp = _getTestOtp(hackerEmail);
+    if (hackerOtp) {
+      await fetch(`${baseUrl}/api/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: hackerEmail, emailOtp: hackerOtp })
+      });
+    }
+
     const badRegRes = await fetch(`${baseUrl}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         name: 'Hacker',
-        email: `hacker_${Date.now()}@jspm.edu`,
+        email: hackerEmail,
         password: 'password123',
         role: 'admin' // Attempt privilege escalation!
       })

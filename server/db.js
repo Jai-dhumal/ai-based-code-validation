@@ -11,13 +11,16 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
+// Pre-computed bcrypt hash for 'password123'
+const DEFAULT_HASHED_PASS = '$2b$10$zP6BVC7XrDeV1dYLegbyOeF9YRhlo2WNdfWMnOXCNbkYyVR9JnDdq';
+
 const defaultData = {
   users: [
     {
       id: 'usr_student_1',
       name: 'Vansh Deshmukh',
       email: 'vansh@jspm.edu',
-      password: 'password123',
+      password: DEFAULT_HASHED_PASS,
       role: 'student',
       rollNo: 'CE2025-01',
       department: 'Computer Engineering',
@@ -30,7 +33,7 @@ const defaultData = {
       id: 'usr_student_2',
       name: 'Jaydeep Dhumal',
       email: 'jaydeep@jspm.edu',
-      password: 'password123',
+      password: DEFAULT_HASHED_PASS,
       role: 'student',
       rollNo: 'CE2025-02',
       department: 'Computer Engineering',
@@ -43,7 +46,7 @@ const defaultData = {
       id: 'usr_student_3',
       name: 'Omkar Chede',
       email: 'omkar@jspm.edu',
-      password: 'password123',
+      password: DEFAULT_HASHED_PASS,
       role: 'student',
       rollNo: 'CE2025-03',
       department: 'Computer Engineering',
@@ -56,7 +59,7 @@ const defaultData = {
       id: 'usr_teacher_1',
       name: 'Prof. Nitin Shivale',
       email: 'nitin.shivale@jspm.edu',
-      password: 'password123',
+      password: DEFAULT_HASHED_PASS,
       role: 'teacher',
       department: 'Computer Engineering',
       title: 'Assistant Professor & Guide',
@@ -69,7 +72,7 @@ const defaultData = {
       id: 'usr_teacher_2',
       name: 'Prof. Anjali Mehta',
       email: 'anjali.mehta@jspm.edu',
-      password: 'password123',
+      password: DEFAULT_HASHED_PASS,
       role: 'teacher',
       department: 'Computer Engineering',
       title: 'Associate Professor',
@@ -82,7 +85,7 @@ const defaultData = {
       id: 'usr_admin_1',
       name: 'Dr. S. K. Patil',
       email: 'admin@jspm.edu',
-      password: 'password123',
+      password: DEFAULT_HASHED_PASS,
       role: 'admin',
       department: 'Computer Engineering',
       title: 'Head of Department & Administrator',
