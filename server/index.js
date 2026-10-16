@@ -334,7 +334,40 @@ export async function sendRealEmailOtp(toEmail, otpCode, role, customTransporter
     `
   };
 
-  // 1. Check if Resend HTTPS API is configured (Bypasses Render / cloud SMTP port 465/587 block)
+  // 1. Check if Brevo HTTPS API is configured (Primary for Cloud/Render: delivers to ANY recipient without domain restriction)
+  const brevoApiKey = process.env.BREVO_API_KEY;
+  if (!customTransporter && brevoApiKey) {
+    try {
+      const senderEmail = process.env.BREVO_SENDER_EMAIL || senderUser || 'dhumaljai@gmail.com';
+      const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': brevoApiKey,
+          'Content-Type': 'application/json',
+          'accept': 'application/json'
+        },
+        body: JSON.stringify({
+          sender: { name: 'JSPM BSIOTR AI Code Validator', email: senderEmail },
+          to: [{ email: toEmail }],
+          subject: mailOptions.subject,
+          htmlContent: mailOptions.html
+        })
+      });
+      const brevoData = await brevoRes.json();
+      if (brevoRes.ok && (brevoData.messageId || brevoData.id)) {
+        console.log(`📧 [EMAIL SENT VIA BREVO HTTPS API] Dispatched to ${toEmail} (ID: ${brevoData.messageId || brevoData.id})`);
+        return {
+          success: true,
+          info: { messageId: brevoData.messageId || brevoData.id }
+        };
+      }
+      console.warn(`⚠️ [BREVO NOTICE] Status ${brevoRes.status}: ${JSON.stringify(brevoData)}`);
+    } catch (brevoErr) {
+      console.warn(`⚠️ [BREVO ERROR] ${brevoErr.message}. Falling back to next provider.`);
+    }
+  }
+
+  // 2. Check if Resend HTTPS API is configured (Bypasses Render / cloud SMTP port 465/587 block)
   const resendApiKey = process.env.RESEND_API_KEY;
   if (!customTransporter && resendApiKey) {
     try {
@@ -365,49 +398,18 @@ export async function sendRealEmailOtp(toEmail, otpCode, role, customTransporter
       
       // If Resend rejected because recipient is unverified on free testing tier:
       if (resendRes.status === 403 && resendData.message && resendData.message.includes('only send testing emails')) {
-        if (process.env.RENDER === 'true' && !process.env.BREVO_API_KEY) {
+        if (process.env.RENDER === 'true') {
           return {
             success: false,
             statusCode: 400,
             errorCode: 'UNVERIFIED_TEST_RECIPIENT',
-            error: `Resend Free Testing Tier currently only delivers to dhumaljai@gmail.com. To send verification emails to any student/faculty address on Render, please add a free Brevo API key or verify a custom domain at resend.com/domains.`
+            error: `Resend Free Testing Tier currently only delivers to dhumaljai@gmail.com. To send verification emails to any student/faculty address on Render, please add BREVO_API_KEY to Render Environment.`
           };
         }
         console.warn(`⚠️ [RESEND NOTICE] Recipient restricted on Resend test tier. Falling back to SMTP...`);
       }
     } catch (resendErr) {
       console.warn(`⚠️ [RESEND ERROR] Failed to send via Resend API: ${resendErr.message}`);
-    }
-  }
-
-  // 2. Check if Brevo HTTPS API is configured
-  const brevoApiKey = process.env.BREVO_API_KEY;
-  if (!customTransporter && brevoApiKey) {
-    try {
-      const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: {
-          'api-key': brevoApiKey,
-          'Content-Type': 'application/json',
-          'accept': 'application/json'
-        },
-        body: JSON.stringify({
-          sender: { name: 'JSPM Code Validator', email: senderUser || 'dhumaljai@gmail.com' },
-          to: [{ email: toEmail }],
-          subject: mailOptions.subject,
-          htmlContent: mailOptions.html
-        })
-      });
-      const brevoData = await brevoRes.json();
-      if (brevoRes.ok && (brevoData.messageId || brevoData.id)) {
-        console.log(`📧 [EMAIL SENT VIA BREVO HTTPS API] Dispatched to ${toEmail} (ID: ${brevoData.messageId || brevoData.id})`);
-        return {
-          success: true,
-          info: { messageId: brevoData.messageId || brevoData.id }
-        };
-      }
-    } catch (brevoErr) {
-      console.warn(`⚠️ [BREVO ERROR] ${brevoErr.message}. Falling back to SMTP.`);
     }
   }
 
