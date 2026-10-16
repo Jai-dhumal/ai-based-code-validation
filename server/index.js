@@ -360,9 +360,23 @@ export async function sendRealEmailOtp(toEmail, otpCode, role, customTransporter
           info: { messageId: resendData.id }
         };
       }
-      console.warn(`⚠️ [RESEND NOTICE] Status ${resendRes.status}: ${resendData.message || JSON.stringify(resendData)}. Falling back to SMTP.`);
+
+      console.warn(`⚠️ [RESEND NOTICE] Status ${resendRes.status}: ${resendData.message || JSON.stringify(resendData)}`);
+      
+      // If Resend rejected because recipient is unverified on free testing tier:
+      if (resendRes.status === 403 && resendData.message && resendData.message.includes('only send testing emails')) {
+        if (process.env.RENDER === 'true' && !process.env.BREVO_API_KEY) {
+          return {
+            success: false,
+            statusCode: 400,
+            errorCode: 'UNVERIFIED_TEST_RECIPIENT',
+            error: `Resend Free Testing Tier currently only delivers to dhumaljai@gmail.com. To send verification emails to any student/faculty address on Render, please add a free Brevo API key or verify a custom domain at resend.com/domains.`
+          };
+        }
+        console.warn(`⚠️ [RESEND NOTICE] Recipient restricted on Resend test tier. Falling back to SMTP...`);
+      }
     } catch (resendErr) {
-      console.warn(`⚠️ [RESEND ERROR] Failed to send via Resend API: ${resendErr.message}. Falling back to SMTP.`);
+      console.warn(`⚠️ [RESEND ERROR] Failed to send via Resend API: ${resendErr.message}`);
     }
   }
 
