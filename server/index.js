@@ -334,6 +334,69 @@ export async function sendRealEmailOtp(toEmail, otpCode, role, customTransporter
     `
   };
 
+  // 1. Check if Resend HTTPS API is configured (Bypasses Render / cloud SMTP port 465/587 block)
+  const resendApiKey = process.env.RESEND_API_KEY;
+  if (!customTransporter && resendApiKey) {
+    try {
+      const fromEmail = process.env.RESEND_FROM || 'JSPM Code Validator <onboarding@resend.dev>';
+      const resendRes = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: fromEmail,
+          to: [toEmail],
+          subject: mailOptions.subject,
+          html: mailOptions.html
+        })
+      });
+      const resendData = await resendRes.json();
+      if (resendRes.ok && resendData.id) {
+        console.log(`📧 [EMAIL SENT VIA RESEND HTTPS API] Dispatched to ${toEmail} (ID: ${resendData.id})`);
+        return {
+          success: true,
+          info: { messageId: resendData.id }
+        };
+      }
+      console.warn(`⚠️ [RESEND NOTICE] Status ${resendRes.status}: ${resendData.message || JSON.stringify(resendData)}. Falling back to SMTP.`);
+    } catch (resendErr) {
+      console.warn(`⚠️ [RESEND ERROR] Failed to send via Resend API: ${resendErr.message}. Falling back to SMTP.`);
+    }
+  }
+
+  // 2. Check if Brevo HTTPS API is configured
+  const brevoApiKey = process.env.BREVO_API_KEY;
+  if (!customTransporter && brevoApiKey) {
+    try {
+      const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': brevoApiKey,
+          'Content-Type': 'application/json',
+          'accept': 'application/json'
+        },
+        body: JSON.stringify({
+          sender: { name: 'JSPM Code Validator', email: senderUser || 'dhumaljai@gmail.com' },
+          to: [{ email: toEmail }],
+          subject: mailOptions.subject,
+          htmlContent: mailOptions.html
+        })
+      });
+      const brevoData = await brevoRes.json();
+      if (brevoRes.ok && (brevoData.messageId || brevoData.id)) {
+        console.log(`📧 [EMAIL SENT VIA BREVO HTTPS API] Dispatched to ${toEmail} (ID: ${brevoData.messageId || brevoData.id})`);
+        return {
+          success: true,
+          info: { messageId: brevoData.messageId || brevoData.id }
+        };
+      }
+    } catch (brevoErr) {
+      console.warn(`⚠️ [BREVO ERROR] ${brevoErr.message}. Falling back to SMTP.`);
+    }
+  }
+
   try {
     const info = await transporter.sendMail(mailOptions);
     console.log(`📧 [EMAIL SENT] Verification email accepted by SMTP server for ${toEmail} (Message ID: ${info.messageId})`);
