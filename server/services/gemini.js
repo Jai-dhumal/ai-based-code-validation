@@ -51,15 +51,87 @@ Respond ONLY with valid JSON in this exact structure:
           return JSON.parse(rawText);
         }
       } else {
-        console.warn('Gemini API call failed with status:', response.status, 'Falling back to offline analyzer');
+        console.warn('Gemini API call failed with status:', response.status, 'Checking for OpenAI fallback...');
       }
     } catch (err) {
-      console.warn('Gemini API request error:', err.message, 'Falling back to offline analyzer');
+      console.warn('Gemini API request error:', err.message, 'Checking for OpenAI fallback...');
+    }
+  }
+
+  // Tier-2 Provider Fallback: OpenAI API (if OPENAI_API_KEY is configured in environment)
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (openaiKey) {
+    try {
+      const openAiResult = await callOpenAiSemanticCheck({
+        code,
+        referenceCode,
+        assignmentTitle,
+        language,
+        openaiKey
+      });
+      if (openAiResult) return openAiResult;
+    } catch (openAiErr) {
+      console.warn('OpenAI fallback error:', openAiErr.message, 'Falling back to offline analyzer');
     }
   }
 
   // Built-in Intelligent Offline Semantic Analyzer Fallback
   return offlineTier2Analyzer(code, referenceCode, assignmentTitle, language);
+}
+
+// Helper: OpenAI Semantic Evaluation Fallback
+async function callOpenAiSemanticCheck({ code, referenceCode, assignmentTitle, language, openaiKey }) {
+  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+  const prompt = `
+Analyze the following STUDENT CODE against the PRIOR SUBMISSION to detect semantic plagiarism, logic equivalence, structural reordering, variable renaming, or AI-generated boilerplate.
+Assignment: "${assignmentTitle}" (Language: ${language})
+
+=== PRIOR SUBMISSION ===
+${referenceCode || 'No prior submission available.'}
+
+=== STUDENT CODE ===
+${code}
+
+Respond ONLY with valid JSON matching this schema:
+{
+  "semanticSimilarityScore": <number between 0 and 100>,
+  "logicEquivalence": "<Low | Moderate | High>",
+  "aiGeneratedLikelihood": "<Low | Medium | High>",
+  "aiConfidencePercentage": <number between 0 and 100>,
+  "renamedIdentifiers": ["<original> -> <renamed>", ...],
+  "verdict": "<Original Implementation | Borderline Modified | Plagiarized / Obfuscated>",
+  "explanation": ["<Finding 1>", "<Finding 2>", "<Finding 3>"],
+  "recommendation": "<Approve for Quiz | Flag for Teacher Review | Reject>"
+}
+`;
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${openaiKey}`
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: 'You are an expert Computer Science Professor and Code Integrity Auditor. Always reply in valid JSON.' },
+        { role: 'user', content: prompt }
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.2
+    })
+  });
+
+  if (response.ok) {
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (content) {
+      const parsed = JSON.parse(content);
+      parsed.provider = 'OpenAI (' + model + ')';
+      return parsed;
+    }
+  }
+  return null;
 }
 
 function offlineTier2Analyzer(code, referenceCode, assignmentTitle, language) {
@@ -190,14 +262,88 @@ Respond ONLY with valid JSON array:
             return parsed;
           }
         }
+      } else {
+        console.warn('Gemini quiz generation failed with status:', response.status, 'Checking OpenAI fallback...');
       }
     } catch (err) {
-      console.warn('Gemini quiz generation error:', err.message, 'Using intelligent dynamic generator');
+      console.warn('Gemini quiz generation error:', err.message, 'Checking OpenAI fallback...');
+    }
+  }
+
+  // Quiz Provider Fallback: OpenAI API
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (openaiKey) {
+    try {
+      const openAiQuestions = await callOpenAiQuizGenerator({
+        code,
+        assignmentTitle,
+        language,
+        openaiKey
+      });
+      if (Array.isArray(openAiQuestions) && openAiQuestions.length >= 8) {
+        return openAiQuestions;
+      }
+    } catch (openAiErr) {
+      console.warn('OpenAI quiz generation error:', openAiErr.message, 'Using intelligent dynamic generator');
     }
   }
 
   // Dynamic code-tailored 10-question generator
   return offlineQuizGenerator(code, assignmentTitle, language);
+}
+
+// Helper: OpenAI Quiz Generation Fallback
+async function callOpenAiQuizGenerator({ code, assignmentTitle, language, openaiKey }) {
+  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+  const prompt = `
+You are a Computer Science Professor conducting a viva/quiz on student submitted code.
+Assignment: "${assignmentTitle}" (Language: ${language})
+
+=== STUDENT CODE ===
+${code}
+
+Generate 10 rigorous multiple choice questions tailored SPECIFICALLY to the student's actual code implementation above.
+Do not ask generic trivia. Ask about specific variables, function flows, complexity, edge conditions, and corner cases present in THEIR code.
+
+Respond ONLY with valid JSON array:
+[
+  {
+    "id": 1,
+    "question": "<Question regarding student's code>",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correctIndex": <0-3>,
+    "explanation": "<Why this answer is correct based on their code>"
+  }
+]
+`;
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${openaiKey}`
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: 'You are a Computer Science Professor. Always respond with a valid JSON array of 10 questions.' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.3
+    })
+  });
+
+  if (response.ok) {
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content?.trim();
+    if (content) {
+      // Remove any markdown code block fencing if present
+      const cleanJson = content.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      const parsed = JSON.parse(cleanJson);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  }
+  return null;
 }
 
 function offlineQuizGenerator(code = '', assignmentTitle = '', language = 'python') {

@@ -10,7 +10,7 @@ const schemaOptions = {
 export const UserSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true, index: true },
   name: { type: String, required: true },
-  email: { type: String, required: true, unique: true, index: true },
+  email: { type: String, required: true, unique: true, index: true, lowercase: true, trim: true },
   password: { type: String, required: true },
   role: { type: String, enum: ['student', 'teacher', 'admin'], default: 'student', index: true },
   rollNo: { type: String, default: '' },

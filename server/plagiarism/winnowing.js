@@ -130,8 +130,12 @@ export function compareCode(codeA, codeB) {
 
 // Compare submission against past submissions
 export function runTier1Check(newCode, pastSubmissions = [], options = {}) {
-  const lowThreshold = options.lowThreshold || 35;
-  const highThreshold = options.highThreshold || 75;
+  const lowThreshold = options.lowThreshold !== undefined ? options.lowThreshold : 35;
+  const highThreshold = options.highThreshold !== undefined ? options.highThreshold : 70;
+
+  // Short code detection to prevent false accusations from trivial boilerplate
+  const newTokens = tokenizeCode(newCode || '');
+  const isShortCode = newTokens.length < 20;
 
   let maxSimilarity = 0;
   let mostSimilarSubmission = null;
@@ -167,14 +171,15 @@ export function runTier1Check(newCode, pastSubmissions = [], options = {}) {
   let status = 'CLEAN';
   let requiresTier2 = false;
 
-  if (maxSimilarity >= highThreshold) {
+  // Strict 70% threshold: "more than 70%" means > 70.0%
+  if (maxSimilarity > highThreshold) {
     verdict = 'High Plagiarism Detected';
     status = 'HIGH_SIMILARITY';
-    requiresTier2 = false;
+    requiresTier2 = true; // Triggers AI review workflow for high plagiarism
   } else if (maxSimilarity >= lowThreshold) {
     verdict = 'Borderline Similarity';
     status = 'BORDERLINE';
-    requiresTier2 = true; // Triggers Tier-2 Gemini AI Check!
+    requiresTier2 = true; // Triggers AI review workflow for borderline similarity
   } else {
     verdict = 'Low Similarity (Unique)';
     status = 'CLEAN';
@@ -186,6 +191,8 @@ export function runTier1Check(newCode, pastSubmissions = [], options = {}) {
     verdict,
     status,
     requiresTier2,
+    isShortCode,
+    shortCodeNotice: isShortCode ? 'Submission is brief (< 20 tokens); similarity may reflect common language syntax rather than plagiarized logic.' : null,
     mostSimilarSubmission,
     allComparisons: comparisonResults
   };

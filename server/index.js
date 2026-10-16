@@ -100,6 +100,16 @@ export function jaccardSimilarity(code1, code2) {
 
   // Build k-grams (k=2) to capture sequence and control flow
   const k = 2;
+  // If token stream is shorter than k=2, compute unigram token-level Jaccard similarity
+  if (literalTokens1.length < k || literalTokens2.length < k) {
+    const s1 = new Set(literalTokens1);
+    const s2 = new Set(literalTokens2);
+    let inter = 0;
+    for (const t of s1) if (s2.has(t)) inter++;
+    const un = new Set([...s1, ...s2]).size;
+    return un > 0 ? Math.round((inter / un) * 100) : 0;
+  }
+
   const ngrams1 = new Set();
   for (let i = 0; i <= literalTokens1.length - k; i++) {
     ngrams1.add(literalTokens1.slice(i, i + k).join(' '));
@@ -1571,19 +1581,17 @@ app.post('/api/validate/tier1', authenticate, async (req, res) => {
     const settings = db.getSettings();
     let pastSubs = [];
     if (assignmentId && assignmentId !== 'all') {
+      // Strictly isolate comparisons to the specified assignment, excluding the current student's own submissions
       pastSubs = db.getSubmissions({ assignmentId }).filter(s => s.studentId !== studentId);
-      // Fallback: if no past submissions for this assignment, compare across all assignments
-      if (pastSubs.length === 0) {
-        pastSubs = db.getSubmissions().filter(s => s.studentId !== studentId);
-      }
     } else {
+      // Universal comparison (e.g. assignmentId='all' or global check)
       pastSubs = db.getSubmissions().filter(s => s.studentId !== studentId);
     }
 
-    // Step 2: Plagiarism Winnowing Check
+    // Step 2: Plagiarism Winnowing Check with strict 70% high threshold
     const plagResult = runTier1Check(code, pastSubs, {
-      lowThreshold: settings.tier1ThresholdLow || 25,
-      highThreshold: settings.tier1ThresholdHigh || 60
+      lowThreshold: settings.tier1ThresholdLow !== undefined ? settings.tier1ThresholdLow : 30,
+      highThreshold: settings.tier1ThresholdHigh !== undefined ? settings.tier1ThresholdHigh : 70
     });
 
     res.json({

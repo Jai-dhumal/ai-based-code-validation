@@ -183,7 +183,7 @@ const defaultData = {
   settings: {
     geminiApiKey: process.env.GEMINI_API_KEY || '',
     tier1ThresholdLow: 30,
-    tier1ThresholdHigh: 60,
+    tier1ThresholdHigh: 70,
     defaultMinQuizScore: 70
   },
   subjects: [
@@ -380,10 +380,15 @@ class Database {
   }
 
   findUserByEmail(email) {
-    return this.data.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    if (!email) return null;
+    const clean = email.trim().toLowerCase();
+    return this.data.users.find(u => u.email && u.email.trim().toLowerCase() === clean);
   }
 
   addUser(user) {
+    if (user && user.email) {
+      user.email = user.email.trim().toLowerCase();
+    }
     this.data.users.push(user);
     this.save();
     this.persistToMongo(User, user);

@@ -71,32 +71,8 @@ export default function CodeEditor({
           </select>
         </div>
 
-        {/* Action Controls & Preset Loaders */}
+        {/* Action Controls */}
         <div className="flex items-center space-x-2">
-          {/* Quick presets for testing */}
-          <div className="hidden sm:flex items-center space-x-1">
-            <button
-              onClick={() => onChange(SAMPLE_CODES.unique.code)}
-              className="text-[11px] px-2.5 py-1 rounded bg-emerald-950/40 text-emerald-400 border border-emerald-800/60 hover:bg-emerald-900/40 transition"
-              title="Load original implementation"
-            >
-              Original Code
-            </button>
-            <button
-              onClick={() => onChange(SAMPLE_CODES.borderline.code)}
-              className="text-[11px] px-2.5 py-1 rounded bg-amber-950/40 text-amber-400 border border-amber-800/60 hover:bg-amber-900/40 transition"
-              title="Load borderline renamed code to trigger Tier-2 Gemini check"
-            >
-              Borderline Code
-            </button>
-            <button
-              onClick={() => onChange(SAMPLE_CODES.copied.code)}
-              className="text-[11px] px-2.5 py-1 rounded bg-red-950/40 text-red-400 border border-red-800/60 hover:bg-red-900/40 transition"
-              title="Load exact copied code"
-            >
-              Copied Code
-            </button>
-          </div>
 
           {/* Upload Button */}
           <input

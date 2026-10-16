@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   CheckCircle2, 
   Clock, 
@@ -23,6 +23,7 @@ import {
   Gauge,
   Layers,
   ChevronRight,
+  ChevronDown,
   Maximize2,
   Minimize2,
   Play,
@@ -252,6 +253,47 @@ export default function StudentPortal({
   const [isRunningCode, setIsRunningCode] = useState(false);
   const [stdinInput, setStdinInput] = useState('');
   const [consoleTab, setConsoleTab] = useState('testcases'); // 'testcases' | 'stdin' | 'output'
+
+  // File Upload & Starter Template State
+  const fileInputRef = useRef(null);
+  const [isPresetsDropdownOpen, setIsPresetsDropdownOpen] = useState(false);
+
+  // Handle local code file upload (.py, .cpp, .c, .java, .js, .txt)
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Auto-detect language from extension
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext === 'py') setSelectedLanguage('python');
+    else if (ext === 'cpp' || ext === 'cc' || ext === 'cxx') setSelectedLanguage('cpp');
+    else if (ext === 'c') setSelectedLanguage('c');
+    else if (ext === 'java') setSelectedLanguage('java');
+    else if (ext === 'js' || ext === 'jsx') setSelectedLanguage('javascript');
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result;
+      if (typeof content === 'string') {
+        setCode(content);
+        // Clear previous analysis so new check can be run
+        setPlagResult(null);
+        setAiReport(null);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  // Reset editor to official faculty starter template
+  const handleResetStarterCode = () => {
+    const template = selectedAssignment?.starterCode?.[selectedLanguage] || 
+      MULTI_LANG_PRESETS[selectedLanguage]?.starter?.code || 
+      '# Write your solution here\n';
+    setCode(template);
+    setPlagResult(null);
+    setAiReport(null);
+  };
 
   // Debounced Live Code Authenticity Detection as student writes code
   useEffect(() => {
@@ -803,8 +845,8 @@ export default function StudentPortal({
   const functionalPassed = plagResult ? plagResult.functionalPassed !== false : true;
   const hasFunctionalError = plagResult && plagResult.functionalPassed === false;
   const isClean = plagResult && functionalPassed && plagResult.score < 35;
-  const isBorderline = plagResult && functionalPassed && plagResult.score >= 35 && plagResult.score < 75;
-  const isHighPlag = plagResult && functionalPassed && plagResult.score >= 75;
+  const isBorderline = plagResult && functionalPassed && plagResult.score >= 35 && plagResult.score <= 70;
+  const isHighPlag = plagResult && functionalPassed && plagResult.score > 70;
   const canTakeQuiz = (isClean || isBorderline) && functionalPassed;
 
   return (
@@ -1103,45 +1145,120 @@ export default function StudentPortal({
             </select>
           </div>
 
-          {/* Quick Demo Buttons for Easy 1-Click Testing */}
+          {/* Professional IDE Action Toolbar */}
           <div className="flex items-center space-x-2">
-            <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">Try Demo:</span>
+            {/* Hidden File Input for code file upload */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              accept=".py,.cpp,.c,.java,.js,.txt,.cc,.cxx,.cs"
+              className="hidden"
+            />
+
+            {/* 1. Upload Code File Button */}
             <button
-              onClick={() => {
-                const presets = MULTI_LANG_PRESETS[selectedLanguage] || DEMO_PRESETS;
-                setCode(presets.original.code);
-              }}
-              className="text-[11px] px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-semibold transition card-float"
-              title="Loads clean, original code"
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center space-x-1.5 text-[11px] px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-semibold transition shadow-xs card-float"
+              title="Upload code file (.py, .cpp, .java, etc.)"
             >
-              Original Code
+              <Upload className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              <span className="hidden sm:inline">Upload File</span>
             </button>
+
+            {/* 2. Reset to Starter Template Button */}
             <button
-              onClick={() => {
-                const presets = MULTI_LANG_PRESETS[selectedLanguage] || DEMO_PRESETS;
-                setCode(presets.borderline.code);
-              }}
-              className="text-[11px] px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-semibold transition card-float"
-              title="Loads modified code with renamed variables"
+              type="button"
+              onClick={handleResetStarterCode}
+              className="flex items-center space-x-1.5 text-[11px] px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-semibold transition shadow-xs card-float"
+              title="Reset code to official assignment starter template"
             >
-              Borderline Code
+              <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+              <span className="hidden sm:inline">Reset Template</span>
             </button>
-            <button
-              onClick={() => {
-                const presets = MULTI_LANG_PRESETS[selectedLanguage] || DEMO_PRESETS;
-                setCode(presets.copied.code);
-              }}
-              className="text-[11px] px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-semibold transition card-float"
-              title="Loads exact copied code"
-            >
-              Copied Code
-            </button>
+
+            {/* 3. Subtle Test Scenarios Dropdown (Preserved for Viva Demonstration) */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsPresetsDropdownOpen(prev => !prev)}
+                className="flex items-center space-x-1.5 text-[11px] px-2.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800 font-semibold transition shadow-xs card-float"
+                title="Load evaluation test scenarios"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                <span className="hidden xs:inline">Test Scenarios</span>
+                <ChevronDown className="w-3 h-3 opacity-70" />
+              </button>
+
+              {isPresetsDropdownOpen && (
+                <div 
+                  className="absolute right-0 mt-1.5 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl py-1.5 z-50 text-xs font-medium"
+                  onMouseLeave={() => setIsPresetsDropdownOpen(false)}
+                >
+                  <div className="px-3.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800 mb-1">
+                    Evaluation Presets (Viva Defense)
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const presets = MULTI_LANG_PRESETS[selectedLanguage] || DEMO_PRESETS;
+                      setCode(presets.original.code);
+                      setPlagResult(null);
+                      setAiReport(null);
+                      setIsPresetsDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 flex items-center space-x-2 transition"
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0"></span>
+                    <div>
+                      <div className="font-bold">Original Solution</div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400">Clean, authentic code (Low similarity)</div>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const presets = MULTI_LANG_PRESETS[selectedLanguage] || DEMO_PRESETS;
+                      setCode(presets.borderline.code);
+                      setPlagResult(null);
+                      setAiReport(null);
+                      setIsPresetsDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-amber-50 dark:hover:bg-amber-950/30 text-amber-800 dark:text-amber-300 flex items-center space-x-2 transition"
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0"></span>
+                    <div>
+                      <div className="font-bold">Borderline Solution</div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400">Renamed variables (Triggers AI check)</div>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const presets = MULTI_LANG_PRESETS[selectedLanguage] || DEMO_PRESETS;
+                      setCode(presets.copied.code);
+                      setPlagResult(null);
+                      setAiReport(null);
+                      setIsPresetsDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-800 dark:text-rose-300 flex items-center space-x-2 transition"
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0"></span>
+                    <div>
+                      <div className="font-bold">Copied Solution</div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400">Direct duplicate match (Flags plagiarism)</div>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* LeetCode Fullscreen / Minimize Toggle */}
             <button
               type="button"
               onClick={() => setIsFullscreen(prev => !prev)}
-              className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-50 transition ml-2"
+              className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition"
               title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen (LeetCode Mode)'}
             >
               {isFullscreen ? <Minimize2 className="w-4 h-4 text-indigo-600" /> : <Maximize2 className="w-4 h-4" />}
