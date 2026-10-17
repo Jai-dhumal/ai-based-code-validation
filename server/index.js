@@ -1428,11 +1428,46 @@ app.delete('/api/admin/students/:id', authenticate, authorize('admin'), (req, re
 // 4. ASSIGNMENTS ENDPOINTS
 // ==========================================
 
-// Get all assignments (public / optionalAuth)
+// Get all assignments (public / optionalAuth - filtered by division & department for students)
 app.get('/api/assignments', optionalAuth, (req, res) => {
   try {
-    const assignments = db.getAssignments();
+    let assignments = db.getAssignments();
     const submissions = db.getSubmissions();
+
+    // Division & Department filtering for students
+    if (req.user && req.user.role === 'student') {
+      const studentDiv = (req.user.division || 'A').toUpperCase();
+      const studentDept = (req.user.department || '').toLowerCase();
+
+      assignments = assignments.filter(a => {
+        // Department check (if assignment specifies a department, it must match student)
+        if (a.department && studentDept && a.department.toLowerCase() !== studentDept) {
+          return false;
+        }
+
+        // Division check:
+        // 1. If assignment has a divisions array
+        if (Array.isArray(a.divisions) && a.divisions.length > 0) {
+          const upperDivs = a.divisions.map(d => String(d).toUpperCase());
+          if (upperDivs.includes('ALL') || upperDivs.includes(studentDiv)) {
+            return true;
+          }
+          return false;
+        }
+
+        // 2. If assignment has single division string
+        if (a.division) {
+          const divUpper = String(a.division).toUpperCase();
+          if (divUpper === 'ALL' || divUpper === studentDiv) {
+            return true;
+          }
+          return false;
+        }
+
+        // 3. Legacy assignments without explicit division are visible to all divisions
+        return true;
+      });
+    }
 
     const enriched = assignments.map(a => {
       const asgSubs = submissions.filter(s => s.assignmentId === a.id);
@@ -1467,10 +1502,30 @@ app.get('/api/assignments/:id', optionalAuth, (req, res) => {
 // Create assignment (Teacher/Admin only)
 app.post('/api/assignments', authenticate, authorize('teacher', 'admin'), (req, res) => {
   try {
-    const { title, subject, code, deadline, languages, minQuizScore, description, starterCode, testcases, expectedOutput } = req.body;
+    const { 
+      title, 
+      subject, 
+      code, 
+      deadline, 
+      languages, 
+      minQuizScore, 
+      description, 
+      starterCode, 
+      testcases, 
+      expectedOutput,
+      department,
+      division,
+      divisions
+    } = req.body;
+
     if (!title || !description) {
       return res.status(400).json({ error: 'Title and description are required' });
     }
+
+    const targetDivision = division || 'all';
+    const targetDivisions = Array.isArray(divisions) && divisions.length > 0
+      ? divisions
+      : (targetDivision.toLowerCase() === 'all' ? ['A', 'B', 'C'] : [targetDivision]);
 
     const newAsg = {
       id: `asg_${Date.now()}`,
@@ -1484,6 +1539,9 @@ app.post('/api/assignments', authenticate, authorize('teacher', 'admin'), (req, 
       testcases: Array.isArray(testcases) ? testcases : [],
       expectedOutput: expectedOutput || '',
       starterCode: starterCode || { python: '# Write your solution here\n' },
+      department: department || req.user.department || 'Computer Engineering',
+      division: targetDivision,
+      divisions: targetDivisions,
       teacherId: req.user.role === 'teacher' ? req.user.id : (req.body.teacherId || null)
     };
 
@@ -1580,16 +1638,37 @@ app.post('/api/validate/tier1', authenticate, async (req, res) => {
 
     const settings = db.getSettings();
     let pastSubs = [];
+    let pastQuizRequests = [];
     if (assignmentId && assignmentId !== 'all') {
       // Strictly isolate comparisons to the specified assignment, excluding the current student's own submissions
       pastSubs = db.getSubmissions({ assignmentId }).filter(s => s.studentId !== studentId);
+      pastQuizRequests = db.getQuizAccessRequests({ assignmentId }).filter(r => r.studentId !== studentId && r.code);
     } else {
       // Universal comparison (e.g. assignmentId='all' or global check)
       pastSubs = db.getSubmissions().filter(s => s.studentId !== studentId);
+      pastQuizRequests = db.getQuizAccessRequests().filter(r => r.studentId !== studentId && r.code);
+    }
+
+    // Combine past submissions and past quiz access requests into a unified comparison pool
+    const combinedComparisonPool = [...pastSubs];
+    const seenStudentIds = new Set(pastSubs.map(s => s.studentId));
+
+    for (const qr of pastQuizRequests) {
+      if (!seenStudentIds.has(qr.studentId)) {
+        combinedComparisonPool.push({
+          id: qr.id,
+          studentId: qr.studentId,
+          studentName: qr.studentName,
+          rollNo: qr.rollNo,
+          code: qr.code,
+          assignmentId: qr.assignmentId
+        });
+        seenStudentIds.add(qr.studentId);
+      }
     }
 
     // Step 2: Plagiarism Winnowing Check with strict 70% high threshold
-    const plagResult = runTier1Check(code, pastSubs, {
+    const plagResult = runTier1Check(code, combinedComparisonPool, {
       lowThreshold: settings.tier1ThresholdLow !== undefined ? settings.tier1ThresholdLow : 30,
       highThreshold: settings.tier1ThresholdHigh !== undefined ? settings.tier1ThresholdHigh : 70
     });
@@ -2198,7 +2277,35 @@ app.get('/api/viva/detail/:vivaId', authenticate, (req, res) => {
 app.get('/api/student/quizzes', authenticate, (req, res) => {
   try {
     const studentId = req.user.id;
-    const assignments = db.getAssignments();
+    let assignments = db.getAssignments();
+
+    // Division & Department filtering for students
+    if (req.user && req.user.role === 'student') {
+      const studentDiv = (req.user.division || 'A').toUpperCase();
+      const studentDept = (req.user.department || '').toLowerCase();
+
+      assignments = assignments.filter(a => {
+        if (a.department && studentDept && a.department.toLowerCase() !== studentDept) {
+          return false;
+        }
+        if (Array.isArray(a.divisions) && a.divisions.length > 0) {
+          const upperDivs = a.divisions.map(d => String(d).toUpperCase());
+          if (upperDivs.includes('ALL') || upperDivs.includes(studentDiv)) {
+            return true;
+          }
+          return false;
+        }
+        if (a.division) {
+          const divUpper = String(a.division).toUpperCase();
+          if (divUpper === 'ALL' || divUpper === studentDiv) {
+            return true;
+          }
+          return false;
+        }
+        return true;
+      });
+    }
+
     const permissions = db.getQuizPermissions({ studentId });
     const submissions = db.getSubmissions({ studentId });
 
@@ -2491,6 +2598,41 @@ app.post('/api/quiz-requests', authenticate, (req, res) => {
         error: 'You already have a pending quiz access request for this assignment',
         existingRequest: existing[0]
       });
+    }
+
+    // Safety check: Validate code against existing submissions & quiz requests
+    if (code && code.trim()) {
+      let pastSubs = [];
+      let pastQuizRequests = [];
+      if (assignmentId && assignmentId !== 'all') {
+        pastSubs = db.getSubmissions({ assignmentId }).filter(s => s.studentId !== studentId);
+        pastQuizRequests = db.getQuizAccessRequests({ assignmentId }).filter(r => r.studentId !== studentId && r.code);
+      } else {
+        pastSubs = db.getSubmissions().filter(s => s.studentId !== studentId);
+        pastQuizRequests = db.getQuizAccessRequests().filter(r => r.studentId !== studentId && r.code);
+      }
+      const combined = [...pastSubs];
+      const seen = new Set(pastSubs.map(s => s.studentId));
+      for (const qr of pastQuizRequests) {
+        if (!seen.has(qr.studentId)) {
+          combined.push({
+            id: qr.id,
+            studentId: qr.studentId,
+            studentName: qr.studentName,
+            rollNo: qr.rollNo,
+            code: qr.code,
+            assignmentId: qr.assignmentId
+          });
+          seen.add(qr.studentId);
+        }
+      }
+      const check = runTier1Check(code, combined, { highThreshold: 70 });
+      if (check.status === 'HIGH_SIMILARITY' || check.score > 70) {
+        return res.status(400).json({
+          error: `High plagiarism detected (${check.score}% similarity). Matching submission: ${check.mostSimilarSubmission?.studentName || 'existing student'}. You cannot request quiz access with plagiarized code.`,
+          plagiarism: check
+        });
+      }
     }
 
     const request = {

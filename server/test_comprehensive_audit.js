@@ -142,8 +142,9 @@ async function runAudit() {
     console.log('\n--- SECTION 2: Assignment-Wise Isolation & Cross-Assignment Exclusion ---');
     const studentToken = regData.token;
 
-    // 2.1 Test code submission on Assignment 2 (which has 0 submissions)
-    // Should NOT compare against Assignment 1 submissions!
+    // 2.1 Test code submission on an isolated assignment with no previous submissions
+    // Should NOT compare against Assignment 1 or Assignment 2 submissions!
+    const emptyAsgId = `asg_isolated_test_${Date.now()}`;
     const asg2Code = `import heapq
 def dijkstra(graph, start_node):
     dist = {start_node: 0}
@@ -164,13 +165,13 @@ def dijkstra(graph, start_node):
       },
       body: JSON.stringify({
         code: asg2Code,
-        assignmentId: 'asg_2',
+        assignmentId: emptyAsgId,
         language: 'python'
       })
     });
     const asg2Data = await asg2Res.json();
-    report(asg2Res.status === 200, 'Tier-1 validation succeeds for Assignment 2');
-    report(asg2Data.score === 0, `Assignment isolation: First submission to Assignment 2 receives 0% similarity (Got: ${asg2Data.score}%)`);
+    report(asg2Res.status === 200, 'Tier-1 validation succeeds for isolated assignment');
+    report(asg2Data.score === 0, `Assignment isolation: First submission receives 0% similarity (Got: ${asg2Data.score}%)`);
     report(asg2Data.allComparisons.length === 0, 'Assignment isolation: Unrelated assignment submissions strictly excluded from comparison list');
 
     // 2.2 Test self-submission exclusion:

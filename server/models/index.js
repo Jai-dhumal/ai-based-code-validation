@@ -53,7 +53,10 @@ export const AssignmentSchema = new mongoose.Schema({
   minQuizScore: { type: Number, default: 70 },
   teacherId: { type: String, default: null, index: true },
   description: { type: String, default: '' },
-  starterCode: { type: mongoose.Schema.Types.Mixed, default: {} }
+  starterCode: { type: mongoose.Schema.Types.Mixed, default: {} },
+  department: { type: String, default: 'Computer Engineering', index: true },
+  division: { type: String, default: 'all', index: true },
+  divisions: [{ type: String }]
 }, schemaOptions);
 
 // 5. Submission Schema

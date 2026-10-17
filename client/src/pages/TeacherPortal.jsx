@@ -76,6 +76,8 @@ export default function TeacherPortal({
   const [deadline, setDeadline] = useState('2026-11-15');
   const [minQuiz, setMinQuiz] = useState(70);
   const [desc, setDesc] = useState('');
+  const [targetDepartment, setTargetDepartment] = useState(currentUser?.department || 'Computer Engineering');
+  const [targetDivision, setTargetDivision] = useState('all');
   const [testcases, setTestcases] = useState([
     { input: "4\n6\n", expectedOutput: "even", explanation: "4 is an even number" },
     { input: "5\n7\n", expectedOutput: "odd", explanation: "5 is an odd number" }
@@ -537,6 +539,9 @@ export default function TeacherPortal({
           deadline: new Date(deadline).toISOString(),
           minQuizScore: Number(minQuiz),
           description: desc,
+          department: targetDepartment || currentUser?.department || 'Computer Engineering',
+          division: targetDivision,
+          divisions: targetDivision === 'all' ? ['A', 'B', 'C'] : [targetDivision],
           languages: ['python', 'cpp', 'c', 'java', 'javascript'],
           testcases: testcases || [],
           starterCode: {
@@ -554,6 +559,7 @@ export default function TeacherPortal({
         if (onRefreshData) onRefreshData();
         setTitle('');
         setDesc('');
+        setTargetDivision('all');
       } else {
         const err = await res.json();
         alert('Error: ' + (err.error || 'Failed to create assignment'));
@@ -1121,9 +1127,14 @@ export default function TeacherPortal({
                 <div key={asg.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xs flex flex-col justify-between space-y-4 card-float transition">
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 font-mono px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl border border-indigo-200 dark:border-indigo-800">
-                        {asg.code}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 font-mono px-2.5 py-1 bg-indigo-50 dark:bg-indigo-950/60 rounded-xl border border-indigo-200 dark:border-indigo-800">
+                          {asg.code}
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                          {asg.division && asg.division.toLowerCase() !== 'all' ? `Div ${asg.division}` : 'All Divs'}
+                        </span>
+                      </div>
                       <span className="text-[10px] px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold">
                         {asgSubs.length} Submissions
                       </span>
@@ -2368,6 +2379,32 @@ export default function TeacherPortal({
                     onChange={(e) => setMinQuiz(e.target.value)}
                     className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Target Department</label>
+                  <input
+                    type="text"
+                    value={targetDepartment}
+                    onChange={(e) => setTargetDepartment(e.target.value)}
+                    placeholder="e.g. Computer Engineering"
+                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Target Division</label>
+                  <select
+                    value={targetDivision}
+                    onChange={(e) => setTargetDivision(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white"
+                  >
+                    <option value="all">All Divisions (A, B, C)</option>
+                    <option value="A">Division A Only</option>
+                    <option value="B">Division B Only</option>
+                    <option value="C">Division C Only</option>
+                  </select>
                 </div>
               </div>
 

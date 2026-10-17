@@ -214,9 +214,14 @@ export default function App() {
                     <BookOpen className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                     My Assignments
                   </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold">
-                    {assignments.length} Tasks
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold border border-indigo-200 dark:border-indigo-800">
+                      Div {currentUser.division || 'A'}
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold">
+                      {assignments.length} Tasks
+                    </span>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -237,9 +242,14 @@ export default function App() {
                         }`}
                       >
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 font-mono">
-                            {asg.code}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 font-mono">
+                              {asg.code}
+                            </span>
+                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold">
+                              {asg.division && asg.division.toLowerCase() !== 'all' ? `Div ${asg.division}` : 'All Divs'}
+                            </span>
+                          </div>
                           {studentSub ? (
                             <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 font-bold flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3" />
