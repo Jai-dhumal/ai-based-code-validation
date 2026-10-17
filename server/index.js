@@ -1680,7 +1680,7 @@ app.post('/api/validate/tier1', authenticate, async (req, res) => {
       functionalStatus: funcCheck.status,
       executionOutput: funcCheck.stdout || '',
       executionError: funcCheck.stderr || '',
-      canProceedToQuiz: funcCheck.passed && !plagResult.requiresTier2 && plagResult.score < 35
+      canProceedToQuiz: funcCheck.passed && (plagResult.score < 35 || plagResult.isShortCode === true)
     });
   } catch (err) {
     res.status(500).json({ error: 'Tier-1 check failed: ' + err.message });
@@ -2627,7 +2627,7 @@ app.post('/api/quiz-requests', authenticate, (req, res) => {
         }
       }
       const check = runTier1Check(code, combined, { highThreshold: 70 });
-      if (check.status === 'HIGH_SIMILARITY' || check.score > 70) {
+      if ((check.status === 'HIGH_SIMILARITY' || check.score > 70) && !check.isShortCode) {
         return res.status(400).json({
           error: `High plagiarism detected (${check.score}% similarity). Matching submission: ${check.mostSimilarSubmission?.studentName || 'existing student'}. You cannot request quiz access with plagiarized code.`,
           plagiarism: check

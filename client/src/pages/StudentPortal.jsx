@@ -323,6 +323,9 @@ export default function StudentPortal({
           if (data.score < 25) {
             setRealtimeStatus('ORIGINAL');
             setRealtimeVerdict('Original / Authentic Code');
+          } else if (data.isShortCode) {
+            setRealtimeStatus('STANDARD_SHORT');
+            setRealtimeVerdict('Standard Short Code Implementation');
           } else if (data.score < 60) {
             setRealtimeStatus('BORDERLINE');
             setRealtimeVerdict('Borderline Similarity Detected');
@@ -846,8 +849,10 @@ export default function StudentPortal({
   const hasFunctionalError = plagResult && plagResult.functionalPassed === false;
   const isClean = plagResult && functionalPassed && plagResult.score < 35;
   const isBorderline = plagResult && functionalPassed && plagResult.score >= 35 && plagResult.score <= 70;
-  const isHighPlag = plagResult && functionalPassed && plagResult.score > 70;
-  const canTakeQuiz = (isClean || isBorderline) && functionalPassed;
+  const isShortCode = plagResult && functionalPassed && plagResult.isShortCode;
+  const isAiApproved = plagResult && functionalPassed && aiReport && (aiReport.recommendation === 'Approve for Quiz' || aiReport.logicEquivalence === 'Low');
+  const isHighPlag = plagResult && functionalPassed && plagResult.score > 70 && !isShortCode && !isAiApproved;
+  const canTakeQuiz = (isClean || isBorderline || isShortCode || isAiApproved) && functionalPassed;
 
   return (
     <div className="space-y-6 font-['Plus_Jakarta_Sans',sans-serif]">
@@ -1282,6 +1287,11 @@ export default function StudentPortal({
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 <span>Original Code ({realtimeScore}% similarity)</span>
               </span>
+            ) : realtimeStatus === 'STANDARD_SHORT' ? (
+              <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold border border-blue-300 text-[11px]">
+                <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
+                <span>Standard Short Code ({realtimeScore}% match)</span>
+              </span>
             ) : realtimeStatus === 'BORDERLINE' ? (
               <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold border border-amber-300 text-[11px]">
                 <AlertCircle className="w-3.5 h-3.5" />
@@ -1664,6 +1674,42 @@ export default function StudentPortal({
 
               <div className="bg-white/70 dark:bg-slate-900/70 p-3.5 rounded-2xl border border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-300">
                 <strong>Why take the viva?</strong> Passing the 10-question comprehension viva with ≥ 70% proves that you authentically understand the logic yourself.
+              </div>
+            </div>
+          )}
+
+          {/* 2.5 If Code is Short / Standard Problem Implementation */}
+          {isShortCode && plagResult.score >= 35 && (
+            <div className="bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-3xl p-6 text-indigo-950 dark:text-indigo-100 space-y-3 card-float">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center space-x-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-base shrink-0 shadow-sm animate-float">
+                    {plagResult.score}%
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-md bg-indigo-200 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 font-bold text-[10px] uppercase">
+                        Standard Short Code
+                      </span>
+                      <h4 className="font-extrabold text-sm text-indigo-900 dark:text-indigo-300">
+                        ⚡ Standard Implementation ({plagResult.score}% match)
+                      </h4>
+                    </div>
+                    <p className="text-xs text-indigo-800 dark:text-indigo-300 mt-1 font-medium">
+                      Because this problem statement has a brief syntax, high similarity with peers is expected. Proceed to Step 2 to take the 10-question AI Viva Quiz to verify your individual comprehension.
+                    </p>
+                  </div>
+                </div>
+
+                {aiReport && (
+                  <button
+                    onClick={() => setIsTier2ModalOpen(true)}
+                    className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-900 dark:hover:bg-indigo-800 text-indigo-900 dark:text-indigo-100 font-bold text-xs transition shrink-0"
+                  >
+                    <HelpCircle className="w-4 h-4" />
+                    <span>View AI Analysis</span>
+                  </button>
+                )}
               </div>
             </div>
           )}

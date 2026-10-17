@@ -133,9 +133,10 @@ export function runTier1Check(newCode, pastSubmissions = [], options = {}) {
   const lowThreshold = options.lowThreshold !== undefined ? options.lowThreshold : 35;
   const highThreshold = options.highThreshold !== undefined ? options.highThreshold : 70;
 
-  // Short code detection to prevent false accusations from trivial boilerplate
+  // Short code detection to prevent false accusations from trivial boilerplate or brief problems
   const newTokens = tokenizeCode(newCode || '');
-  const isShortCode = newTokens.length < 20;
+  const nonWhitespaceLines = (newCode || '').split('\n').filter(l => l.trim().length > 0);
+  const isShortCode = newTokens.length <= 50 || nonWhitespaceLines.length <= 12;
 
   let maxSimilarity = 0;
   let mostSimilarSubmission = null;
