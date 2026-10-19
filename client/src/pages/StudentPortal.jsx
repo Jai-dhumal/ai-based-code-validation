@@ -2285,6 +2285,8 @@ export default function StudentPortal({
         isOpen={isQuizModalOpen}
         onClose={() => setIsQuizModalOpen(false)}
         quizData={quizData}
+        assignmentTitle={selectedAssignment?.title}
+        assignmentSubject={selectedAssignment?.subject}
         onSubmitQuiz={handleSubmitQuiz}
         isSubmitting={isSubmittingQuiz}
         result={quizResult}

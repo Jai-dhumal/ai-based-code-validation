@@ -10,7 +10,9 @@ import {
   Sparkles,
   GitBranch,
   X,
-  HelpCircle
+  HelpCircle,
+  FileCode2,
+  BookOpen
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -18,6 +20,8 @@ export default function QuizModal({
   isOpen, 
   onClose, 
   quizData, 
+  assignmentTitle,
+  assignmentSubject,
   onSubmitQuiz, 
   isSubmitting, 
   result,
@@ -26,6 +30,8 @@ export default function QuizModal({
 }) {
   const [selectedAnswers, setSelectedAnswers] = useState({});
   const [timeLeft, setTimeLeft] = useState(600); // 10 minutes for 10 questions
+  const displayTitle = assignmentTitle || quizData?.assignmentTitle || 'Assignment Viva';
+  const displaySubject = assignmentSubject || quizData?.assignmentSubject || '';
 
   useEffect(() => {
     if (!isOpen || result) return;
@@ -93,17 +99,25 @@ export default function QuizModal({
               <BrainCircuit className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
                   AI Code Comprehension Viva (10 Questions)
                 </h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
-                  Pass: ≥ 70% (7/10)
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800">
+                  Pass: ≥ {quizData.passingThreshold || 70}% (7/10)
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                10 conceptual questions derived directly from your submitted implementation.
-              </p>
+              <div className="flex flex-wrap items-center gap-2 mt-1">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 font-bold text-xs border border-indigo-200/80 dark:border-indigo-800/80 shadow-xs">
+                  <FileCode2 className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                  <span>Assignment: <strong>{displayTitle}</strong></span>
+                </span>
+                {displaySubject && (
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                    • {displaySubject}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -159,6 +173,12 @@ export default function QuizModal({
                     {result.passed ? <Award className="w-7 h-7" /> : <XCircle className="w-7 h-7" />}
                   </div>
                   <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md bg-white/80 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200">
+                        <FileCode2 className="w-3 h-3 text-indigo-500" />
+                        <span>Assignment: <strong>{displayTitle}</strong></span>
+                      </span>
+                    </div>
                     <h4 className="text-base font-extrabold">
                       {result.passed ? '🎉 Viva Understanding Verified!' : '⚠️ Minimum Passing Score Not Met'}
                     </h4>

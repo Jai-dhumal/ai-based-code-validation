@@ -1890,7 +1890,10 @@ app.post('/api/quiz/generate', authenticate, async (req, res) => {
       questions: sanitizedQuestions,
       quizKey,
       count: sanitizedQuestions.length,
-      passingThreshold: assignment ? assignment.minQuizScore : 70
+      passingThreshold: assignment ? assignment.minQuizScore : 70,
+      assignmentTitle: assignment ? assignment.title : 'Assignment Viva Quiz',
+      assignmentSubject: assignment ? assignment.subject : '',
+      assignmentId
     });
   } catch (err) {
     console.error('Quiz generation error:', err);
