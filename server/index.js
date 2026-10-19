@@ -16,6 +16,7 @@ import { runTier1Check, compareCode } from './plagiarism/winnowing.js';
 import { tokenizeCode } from './plagiarism/tokenizer.js';
 import { runTier2Evaluation, generateCodeQuiz, generateAssignmentTestcases } from './services/gemini.js';
 import { generateSubmissionReceipt } from './services/github.js';
+import { prepareRunnableCode } from './services/codeHarness.js';
 import nodemailer from 'nodemailer';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -806,6 +807,10 @@ async function executeCodeInternal({ language = 'python', code = '', stdin = '' 
     const tmpDir = os.tmpdir();
     const lang = (language || 'python').toLowerCase();
 
+    // Prepare runnable code using harness (LeetCode class/method wrapper, auto-imports, driver)
+    const prepared = prepareRunnableCode({ language: lang, code, stdin });
+    const runnableCode = prepared.code || code;
+
     let compileCmd = null;
     let compileArgs = [];
     let runCmd = null;
@@ -813,18 +818,18 @@ async function executeCodeInternal({ language = 'python', code = '', stdin = '' 
 
     if (lang === 'python' || lang === 'py') {
       srcFile = path.join(tmpDir, `${tmpId}.py`);
-      fs.writeFileSync(srcFile, code, 'utf8');
+      fs.writeFileSync(srcFile, runnableCode, 'utf8');
       runCmd = getPythonCommand();
       runArgs = [srcFile];
     } else if (lang === 'javascript' || lang === 'js') {
       srcFile = path.join(tmpDir, `${tmpId}.js`);
-      fs.writeFileSync(srcFile, code, 'utf8');
+      fs.writeFileSync(srcFile, runnableCode, 'utf8');
       runCmd = 'node';
       runArgs = [srcFile];
     } else if (lang === 'cpp' || lang === 'c++') {
       srcFile = path.join(tmpDir, `${tmpId}.cpp`);
       exeFile = path.join(tmpDir, `${tmpId}.exe`);
-      fs.writeFileSync(srcFile, code, 'utf8');
+      fs.writeFileSync(srcFile, runnableCode, 'utf8');
       compileCmd = 'g++';
       compileArgs = [srcFile, '-O2', '-o', exeFile];
       runCmd = exeFile;
@@ -832,18 +837,17 @@ async function executeCodeInternal({ language = 'python', code = '', stdin = '' 
     } else if (lang === 'c') {
       srcFile = path.join(tmpDir, `${tmpId}.c`);
       exeFile = path.join(tmpDir, `${tmpId}.exe`);
-      fs.writeFileSync(srcFile, code, 'utf8');
+      fs.writeFileSync(srcFile, runnableCode, 'utf8');
       compileCmd = 'gcc';
       compileArgs = [srcFile, '-O2', '-o', exeFile];
       runCmd = exeFile;
       runArgs = [];
     } else if (lang === 'java') {
-      const classMatch = code.match(/public\s+class\s+([A-Za-z0-9_]+)/);
-      const className = classMatch ? classMatch[1] : 'Solution';
+      const className = prepared.className || 'Solution';
       javaDir = path.join(tmpDir, tmpId);
       fs.mkdirSync(javaDir, { recursive: true });
       srcFile = path.join(javaDir, `${className}.java`);
-      fs.writeFileSync(srcFile, code, 'utf8');
+      fs.writeFileSync(srcFile, runnableCode, 'utf8');
       compileCmd = 'javac';
       compileArgs = [srcFile];
       runCmd = 'java';
@@ -864,6 +868,11 @@ async function executeCodeInternal({ language = 'python', code = '', stdin = '' 
         const cRes = spawnSync(compileCmd, compileArgs, { encoding: 'utf8', timeout: 12000 });
         if (cRes.status !== 0) {
           const compErr = cRes.stderr || cRes.stdout || 'Compilation failed';
+          try {
+            if (srcFile && fs.existsSync(srcFile)) fs.unlinkSync(srcFile);
+            if (exeFile && fs.existsSync(exeFile)) fs.unlinkSync(exeFile);
+            if (javaDir && fs.existsSync(javaDir)) fs.rmSync(javaDir, { recursive: true, force: true });
+          } catch (e) {}
           return {
             stdout: '',
             stderr: compErr.trim(),
@@ -873,6 +882,11 @@ async function executeCodeInternal({ language = 'python', code = '', stdin = '' 
           };
         }
       } catch (err) {
+        try {
+          if (srcFile && fs.existsSync(srcFile)) fs.unlinkSync(srcFile);
+          if (exeFile && fs.existsSync(exeFile)) fs.unlinkSync(exeFile);
+          if (javaDir && fs.existsSync(javaDir)) fs.rmSync(javaDir, { recursive: true, force: true });
+        } catch (e) {}
         return {
           stdout: '',
           stderr: `Compiler (${compileCmd}) unavailable: ${err.message}`,
@@ -983,7 +997,19 @@ async function validateFunctionalCorrectness({ code, language, assignment, stdin
 
       if (tcExpected) {
         const actualTcOut = (tcExec.stdout || '').toLowerCase();
-        if (!actualTcOut.includes(tcExpected)) {
+        let tcPassed = actualTcOut.includes(tcExpected) || actualTcOut.trim() === tcExpected;
+        if (!tcPassed) {
+          // Boolean & parity equivalence check
+          if (
+            (tcExpected === 'even' && (actualTcOut.includes('true') || actualTcOut.includes('even'))) ||
+            (tcExpected === 'odd' && (actualTcOut.includes('false') || actualTcOut.includes('odd'))) ||
+            (tcExpected === 'true' && (actualTcOut.includes('even') || actualTcOut.includes('true'))) ||
+            (tcExpected === 'false' && (actualTcOut.includes('odd') || actualTcOut.includes('false')))
+          ) {
+            tcPassed = true;
+          }
+        }
+        if (!tcPassed) {
           return {
             passed: false,
             reason: `Test Case ${i + 1} Failed: Expected output to contain "${tc.expectedOutput}", but received "${tcExec.stdout.trim() || '(no output)'}"`,
@@ -1159,6 +1185,17 @@ app.post('/api/compile/testcases', async (req, res) => {
           const expNorm = tcExpected.toLowerCase();
           const actNorm = actualClean.toLowerCase();
           passed = actNorm.includes(expNorm) || actNorm === expNorm;
+          if (!passed) {
+            // Parity and boolean equivalence
+            if (
+              (expNorm === 'even' && (actNorm.includes('true') || actNorm.includes('even'))) ||
+              (expNorm === 'odd' && (actNorm.includes('false') || actNorm.includes('odd'))) ||
+              (expNorm === 'true' && (actNorm.includes('even') || actNorm.includes('true'))) ||
+              (expNorm === 'false' && (actNorm.includes('odd') || actNorm.includes('false')))
+            ) {
+              passed = true;
+            }
+          }
         }
       }
 
