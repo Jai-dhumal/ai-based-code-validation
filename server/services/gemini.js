@@ -215,18 +215,58 @@ function offlineTier2Analyzer(code, referenceCode, assignmentTitle, language) {
   };
 }
 
-export async function generateCodeQuiz({ code, assignmentTitle, language, apiKey }) {
+// Helper: Shuffle options for every question & shuffle question pool
+export function shuffleOptionsAndQuestions(questions, count = 10) {
+  if (!Array.isArray(questions) || questions.length === 0) return [];
+
+  // 1. Shuffle options for each individual question and update correctIndex
+  const withShuffledOptions = questions.map(q => {
+    if (!Array.isArray(q.options) || q.options.length < 2) return q;
+    const correctVal = q.options[q.correctIndex || 0];
+    const opts = [...q.options];
+
+    for (let i = opts.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [opts[i], opts[j]] = [opts[j], opts[i]];
+    }
+
+    const newIndex = opts.indexOf(correctVal);
+    return {
+      ...q,
+      options: opts,
+      correctIndex: newIndex >= 0 ? newIndex : 0
+    };
+  });
+
+  // 2. Shuffle questions themselves so retake attempts have fresh order
+  const shuffledQuestions = [...withShuffledOptions];
+  for (let i = shuffledQuestions.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffledQuestions[i], shuffledQuestions[j]] = [shuffledQuestions[j], shuffledQuestions[i]];
+  }
+
+  // 3. Take requested count (default 10) and re-assign 1-based IDs
+  return shuffledQuestions.slice(0, count).map((q, idx) => ({
+    ...q,
+    id: idx + 1
+  }));
+}
+
+export async function generateCodeQuiz({ code, assignmentTitle, language, apiKey, attempt }) {
+  const attemptNum = attempt || 1;
   if (apiKey) {
     try {
       const prompt = `
-You are a Computer Science Professor conducting a viva/quiz on student submitted code.
+You are a Computer Science Professor conducting an AI viva/quiz on student submitted code.
 Assignment: "${assignmentTitle}" (Language: ${language})
+Attempt: #${attemptNum} (Generate a completely fresh, unique set of 10 questions testing different statements, variables, logic branches, and edge cases than any previous attempt).
 
 === STUDENT CODE ===
 ${code}
 
 Generate 10 rigorous multiple choice questions tailored SPECIFICALLY to the student's actual code implementation above.
 Do not ask generic trivia. Ask about specific variables, function flows, complexity, edge conditions, and corner cases present in THEIR code.
+Ensure answers are evenly distributed across choices.
 
 Respond ONLY with valid JSON array:
 [
@@ -247,7 +287,7 @@ Respond ONLY with valid JSON array:
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            temperature: 0.3,
+            temperature: 0.7,
             responseMimeType: 'application/json'
           }
         })
@@ -259,7 +299,7 @@ Respond ONLY with valid JSON array:
         if (rawText) {
           const parsed = JSON.parse(rawText);
           if (Array.isArray(parsed) && parsed.length >= 8) {
-            return parsed;
+            return shuffleOptionsAndQuestions(parsed, 10);
           }
         }
       } else {
@@ -278,10 +318,11 @@ Respond ONLY with valid JSON array:
         code,
         assignmentTitle,
         language,
-        openaiKey
+        openaiKey,
+        attempt: attemptNum
       });
       if (Array.isArray(openAiQuestions) && openAiQuestions.length >= 8) {
-        return openAiQuestions;
+        return shuffleOptionsAndQuestions(openAiQuestions, 10);
       }
     } catch (openAiErr) {
       console.warn('OpenAI quiz generation error:', openAiErr.message, 'Using intelligent dynamic generator');
@@ -289,15 +330,16 @@ Respond ONLY with valid JSON array:
   }
 
   // Dynamic code-tailored 10-question generator
-  return offlineQuizGenerator(code, assignmentTitle, language);
+  return offlineQuizGenerator(code, assignmentTitle, language, attemptNum);
 }
 
 // Helper: OpenAI Quiz Generation Fallback
-async function callOpenAiQuizGenerator({ code, assignmentTitle, language, openaiKey }) {
+async function callOpenAiQuizGenerator({ code, assignmentTitle, language, openaiKey, attempt = 1 }) {
   const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
   const prompt = `
-You are a Computer Science Professor conducting a viva/quiz on student submitted code.
+You are a Computer Science Professor conducting an AI viva/quiz on student submitted code.
 Assignment: "${assignmentTitle}" (Language: ${language})
+Attempt: #${attempt} (Generate fresh questions testing different code branches, variables, and edge cases).
 
 === STUDENT CODE ===
 ${code}
@@ -329,7 +371,7 @@ Respond ONLY with valid JSON array:
         { role: 'system', content: 'You are a Computer Science Professor. Always respond with a valid JSON array of 10 questions.' },
         { role: 'user', content: prompt }
       ],
-      temperature: 0.3
+      temperature: 0.7
     })
   });
 
@@ -337,7 +379,6 @@ Respond ONLY with valid JSON array:
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content?.trim();
     if (content) {
-      // Remove any markdown code block fencing if present
       const cleanJson = content.replace(/^```json\s*/, '').replace(/\s*```$/, '');
       const parsed = JSON.parse(cleanJson);
       if (Array.isArray(parsed)) return parsed;
@@ -346,7 +387,7 @@ Respond ONLY with valid JSON array:
   return null;
 }
 
-function offlineQuizGenerator(code = '', assignmentTitle = '', language = 'python') {
+function offlineQuizGenerator(code = '', assignmentTitle = '', language = 'python', attempt = 1) {
   const lang = (language || 'python').toLowerCase();
   const title = (assignmentTitle || 'Coding Assignment').trim();
   const lowerTitle = title.toLowerCase();
@@ -358,7 +399,7 @@ function offlineQuizGenerator(code = '', assignmentTitle = '', language = 'pytho
 
   if (isBST) {
     const hasWhile = code.includes('while');
-    return [
+    const bstPool = [
       {
         id: 1,
         question: `In your Binary Search Tree implementation for "${title}", what is the worst-case time complexity of inserting elements in strictly increasing order?`,
@@ -489,12 +530,73 @@ function offlineQuizGenerator(code = '', assignmentTitle = '', language = 'pytho
         ],
         correctIndex: 0,
         explanation: 'The fundamental BST property requires all left descendants < root < all right descendants.'
+      },
+      {
+        id: 11,
+        question: 'When deleting a node that possesses two children from a BST, which replacement node preserves the BST ordering property?',
+        options: [
+          'The in-order successor (minimum node in right subtree) or in-order predecessor (maximum in left subtree)',
+          'The root node of the entire tree',
+          'Any randomly selected leaf node',
+          'The left child of the root node'
+        ],
+        correctIndex: 0,
+        explanation: 'Replacing with in-order successor or predecessor guarantees that all left keys remain smaller and all right keys remain larger.'
+      },
+      {
+        id: 12,
+        question: 'Where is the minimum value key in a non-empty Binary Search Tree always located?',
+        options: [
+          'At the leftmost node reachable by repeatedly following left child pointers',
+          'At the root node',
+          'At the rightmost leaf node',
+          'At a random node depending on insertion time'
+        ],
+        correctIndex: 0,
+        explanation: 'Because smaller keys are placed to the left at every node, the minimum value is always at the leftmost node.'
+      },
+      {
+        id: 13,
+        question: 'What is the height of a balanced Binary Search Tree containing n nodes?',
+        options: [
+          'O(log n) logarithmic height',
+          'O(n) linear height',
+          'O(n²) quadratic height',
+          'O(1) constant height'
+        ],
+        correctIndex: 0,
+        explanation: 'A balanced BST divides nodes equally across branches, maintaining a height proportional to log₂(n).'
+      },
+      {
+        id: 14,
+        question: 'Which tree traversal algorithm processes nodes in the order: Root -> Left Subtree -> Right Subtree?',
+        options: [
+          'Pre-order traversal',
+          'In-order traversal',
+          'Post-order traversal',
+          'Level-order traversal'
+        ],
+        correctIndex: 0,
+        explanation: 'Pre-order traversal visits the current root first before recursively traversing the left and right subtrees.'
+      },
+      {
+        id: 15,
+        question: 'What is the best-case time complexity of searching for an element in a Binary Search Tree?',
+        options: [
+          'O(1) when the target value is located at the root node',
+          'O(log n)',
+          'O(n)',
+          'O(n log n)'
+        ],
+        correctIndex: 0,
+        explanation: 'If the target key equals the root node value, the search succeeds on the first comparison in O(1) time.'
       }
     ];
+    return shuffleOptionsAndQuestions(bstPool, 10);
   }
 
   if (isDijkstra) {
-    return [
+    const dijkstraPool = [
       {
         id: 1,
         question: `What is the core purpose of Dijkstra's algorithm implemented in your solution for "${title}"?`,
@@ -614,8 +716,69 @@ function offlineQuizGenerator(code = '', assignmentTitle = '', language = 'pytho
         ],
         correctIndex: 0,
         explanation: 'The distance table, visited set, priority queue, and adjacency list require O(V + E) auxiliary space.'
+      },
+      {
+        id: 11,
+        question: 'Once a node u is extracted from the min-heap and marked visited in Dijkstra (with non-negative weights), can its shortest distance decrease later?',
+        options: [
+          'No, the greedy property guarantees that dist[u] is already optimal and permanent',
+          'Yes, it can decrease if relaxed by a downstream node',
+          'Yes, only if the graph has directed cycles',
+          'Depends on the initial capacity of the heap'
+        ],
+        correctIndex: 0,
+        explanation: 'With non-negative edge weights, any alternate path to u must pass through another unvisited node with distance >= dist[u].'
+      },
+      {
+        id: 12,
+        question: 'What is the primary difference in greedy criteria between Dijkstra’s algorithm and Prim’s algorithm?',
+        options: [
+          'Dijkstra minimizes total path distance from source (dist[u] + w), while Prim minimizes edge weight into MST (w)',
+          'Dijkstra works on unweighted graphs only, Prim works on weighted graphs',
+          'Dijkstra uses a stack, while Prim uses a FIFO queue',
+          'Dijkstra detects cycles, Prim does not'
+        ],
+        correctIndex: 0,
+        explanation: 'Dijkstra optimizes cumulative distance from source, while Prim optimizes the lightest connection to expand the tree.'
+      },
+      {
+        id: 13,
+        question: 'What occurs if Dijkstra’s algorithm is executed on a graph with negative-weight edges?',
+        options: [
+          'It may produce incorrect shortest path distances because already visited nodes are not reconsidered',
+          'It automatically converts negative weights to absolute positive values',
+          'It executes faster than on positive graphs',
+          'It always throws a compile-time syntax error'
+        ],
+        correctIndex: 0,
+        explanation: 'Dijkstra does not re-visit closed vertices, so a negative edge discovered later cannot correct previous shortest estimates.'
+      },
+      {
+        id: 14,
+        question: 'If all edge weights in a graph are identical positive constants (e.g., all 1), which simpler algorithm achieves O(V + E) time?',
+        options: [
+          'Breadth-First Search (BFS) using a standard FIFO queue',
+          'Depth-First Search (DFS)',
+          'Binary Search',
+          'Merge Sort'
+        ],
+        correctIndex: 0,
+        explanation: 'On unweighted or uniformly weighted graphs, standard BFS discovers shortest paths in O(V + E) without priority queue overhead.'
+      },
+      {
+        id: 15,
+        question: 'In Dijkstra, how is the actual shortest path sequence reconstructed from source to destination?',
+        options: [
+          'By maintaining a `parent` or `predecessor` array updated during edge relaxation and backtracking from destination to source',
+          'By re-running the algorithm in reverse',
+          'By sorting all node IDs in ascending numerical order',
+          'By recording timestamps of CPU execution'
+        ],
+        correctIndex: 0,
+        explanation: 'Setting parent[v] = u during relaxation allows reconstructing the path by tracing parent pointers back from target to source.'
       }
     ];
+    return shuffleOptionsAndQuestions(dijkstraPool, 10);
   }
 
   // General code analyzer (e.g. "print Jay Ganesh", or any general code)
@@ -642,7 +805,7 @@ function offlineQuizGenerator(code = '', assignmentTitle = '', language = 'pytho
 
   const hasLoop = code.includes('for ') || code.includes('while ') || code.includes('for(') || code.includes('while(');
 
-  return [
+  const generalPool = [
     {
       id: 1,
       question: `What is the primary requirement and expected output of your program for "${title}"?`,
@@ -820,8 +983,94 @@ function offlineQuizGenerator(code = '', assignmentTitle = '', language = 'pytho
       ],
       correctIndex: 0,
       explanation: 'Good software engineering prioritizes correctness, clarity, simplicity, and adherence to requirements.'
+    },
+    {
+      id: 11,
+      question: 'In conditional branching, what does the modulo operator expression `n % 2 == 0` evaluate to?',
+      options: [
+        'True if n is an even number (divisible by 2 with 0 remainder), False if odd',
+        'True if n is a prime number',
+        'The floating-point quotient of n divided by 2',
+        'True if n is negative'
+      ],
+      correctIndex: 0,
+      explanation: 'The modulo operator % returns the remainder of integer division; remainder 0 when divided by 2 signifies an even number.'
+    },
+    {
+      id: 12,
+      question: 'What is the purpose of input validation before performing computations on user data?',
+      options: [
+        'To guard against invalid types, unexpected ranges, and boundary errors that could crash the program',
+        'To speed up CPU clock speed',
+        'To encrypt the program binary on disk',
+        'To automatically convert the program to machine code'
+      ],
+      correctIndex: 0,
+      explanation: 'Input validation ensures program resilience by filtering out invalid input before processing occurs.'
+    },
+    {
+      id: 13,
+      question: 'In logical operations, what is "short-circuit evaluation" in an expression `A && B` (or `A and B`)?',
+      options: [
+        'If expression A evaluates to false, expression B is not evaluated because the entire AND expression is guaranteed false',
+        'Both A and B are evaluated concurrently on GPU cores',
+        'If A is true, the program immediately halts',
+        'B is evaluated first, then A'
+      ],
+      correctIndex: 0,
+      explanation: 'Short-circuiting skips evaluating operand B once operand A evaluates to false in an AND operation.'
+    },
+    {
+      id: 14,
+      question: 'What is the time complexity of a single loop that iterates from 1 to n with a constant increment?',
+      options: [
+        'O(n) linear time complexity',
+        'O(log n) logarithmic time complexity',
+        'O(n²) quadratic time complexity',
+        'O(1) constant time complexity'
+      ],
+      correctIndex: 0,
+      explanation: 'A loop that runs n times with O(1) operations in the body executes in O(n) linear time.'
+    },
+    {
+      id: 15,
+      question: 'What error typically occurs if a loop boundary index exceeds the allocated size of an array/list?',
+      options: [
+        'An out-of-bounds error (IndexError, ArrayIndexOutOfBoundsException, or Segmentation Fault)',
+        'The program silently reallocates RAM infinitely',
+        'The array reverses its elements automatically',
+        'A compile-time division by zero exception'
+      ],
+      correctIndex: 0,
+      explanation: 'Accessing an index >= length of an array breaches memory bounds, triggering an out-of-bounds runtime exception.'
+    },
+    {
+      id: 16,
+      question: 'What is the key difference between a `while` loop and an `if` statement?',
+      options: [
+        'A `while` loop repeatedly re-executes its block as long as the condition holds, whereas an `if` statement executes at most once',
+        'An `if` statement can execute indefinitely',
+        'A `while` loop cannot check boolean expressions',
+        'They are completely identical in execution'
+      ],
+      correctIndex: 0,
+      explanation: 'An `if` statement performs a single conditional check; a `while` loop repeats execution until the condition becomes false.'
+    },
+    {
+      id: 17,
+      question: 'In programming, why are descriptive variable and function names considered essential practice?',
+      options: [
+        'They make code self-documenting, readable, maintainable, and easier to debug during academic evaluation',
+        'They compress the compiled binary into a smaller size',
+        'They force the CPU to run at higher GHz clock speed',
+        'They prevent memory leaks automatically'
+      ],
+      correctIndex: 0,
+      explanation: 'Meaningful naming communicates intent and semantics clearly to peer developers and evaluators.'
     }
   ];
+
+  return shuffleOptionsAndQuestions(generalPool, 10);
 }
 
 export async function generateAssignmentTestcases({ title = '', description = '', language = 'cpp', apiKey }) {

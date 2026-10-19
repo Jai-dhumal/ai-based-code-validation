@@ -1722,7 +1722,7 @@ app.post('/api/validate/tier2', authenticate, async (req, res) => {
 // Generate AI Viva Quiz — checks quiz permission for student
 app.post('/api/quiz/generate', authenticate, async (req, res) => {
   try {
-    const { code, assignmentId, language } = req.body;
+    const { code, assignmentId, language, attempt } = req.body;
     const studentId = req.user.role === 'student' ? req.user.id : (req.body.studentId || req.user.id);
 
     if (!code || !assignmentId) {
@@ -1747,7 +1747,8 @@ app.post('/api/quiz/generate', authenticate, async (req, res) => {
       code,
       assignmentTitle: assignment ? assignment.title : 'Data Structures',
       language: language || (assignment && assignment.languages ? assignment.languages[0] : 'python'),
-      apiKey
+      apiKey,
+      attempt: Number(attempt) || 1
     });
 
     // Strip answers from client payload

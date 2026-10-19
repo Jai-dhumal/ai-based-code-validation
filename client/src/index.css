@@ -55,3 +55,141 @@
 .code-font {
   font-family: 'Fira Code', monospace;
 }
+
+/* ========================================================================= */
+/* PRINT & PDF EXPORT STYLESHEET                                             */
+/* Prevents content overlap, resets dark themes, hides interactive web UI    */
+/* ========================================================================= */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 10mm 12mm 10mm;
+  }
+
+  /* 1. Hide interactive web navigation, action buttons, inputs & modals */
+  header,
+  nav,
+  aside,
+  button,
+  input,
+  select,
+  textarea,
+  .no-print,
+  [role="dialog"] {
+    display: none !important;
+  }
+
+  /* 2. Reset html/body to pure paper white background and crisp dark ink */
+  html, body {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 10pt !important;
+    line-height: 1.35 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* 3. Dark mode overrides: force white background and dark text on cards */
+  .dark,
+  .dark body,
+  .dark [class*="bg-slate-"],
+  .dark [class*="bg-slate-900"],
+  .dark [class*="bg-slate-800"] {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    border-color: #e2e8f0 !important;
+  }
+
+  .dark [class*="text-white"],
+  .dark [class*="text-slate-100"],
+  .dark [class*="text-slate-200"],
+  .dark [class*="text-slate-300"] {
+    color: #0f172a !important;
+  }
+
+  /* 4. Disable floating animations, transforms, and blur filters that trigger raster overlap */
+  .card-float,
+  .card-float:hover,
+  [class*="animate-"] {
+    transform: none !important;
+    animation: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+
+  /* 5. Force full width and cancel responsive overflow truncations */
+  .max-w-7xl,
+  .max-w-6xl,
+  .max-w-5xl,
+  .max-w-4xl,
+  .overflow-x-auto {
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow: visible !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  /* 6. Clean card and section borders without heavy shadows */
+  [class*="rounded-3xl"],
+  [class*="rounded-2xl"],
+  [class*="rounded-xl"] {
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    border: 1px solid #cbd5e1 !important;
+    margin-bottom: 12px !important;
+  }
+
+  /* 7. Page break prevention on critical report elements */
+  table,
+  tr,
+  .print-avoid-break,
+  [class*="grid"] > div {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* 8. Table styling for clear academic printing */
+  thead {
+    display: table-header-group !important;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto;
+  }
+
+  th {
+    background-color: #f1f5f9 !important;
+    color: #334155 !important;
+    border: 1px solid #cbd5e1 !important;
+    padding: 6px 8px !important;
+    font-size: 8.5pt !important;
+    text-transform: uppercase !important;
+  }
+
+  td {
+    border: 1px solid #e2e8f0 !important;
+    padding: 6px 8px !important;
+    font-size: 8.5pt !important;
+    color: #1e293b !important;
+  }
+
+  /* 9. Preserve colored status badges on print */
+  [class*="bg-emerald-"],
+  [class*="bg-indigo-"],
+  [class*="bg-purple-"],
+  [class*="bg-amber-"],
+  [class*="bg-red-"] {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

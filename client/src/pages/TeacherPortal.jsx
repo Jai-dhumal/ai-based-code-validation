@@ -619,10 +619,26 @@ export default function TeacherPortal({
   return (
     <div className="space-y-6 font-['Plus_Jakarta_Sans',sans-serif]">
       
+      {/* Official Academic Print Header (Only visible on paper / PDF export) */}
+      <div className="hidden print:block p-4 mb-4 bg-white border-b-2 border-slate-800">
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">JSPM'S BSIOTR, WAGHOLI, PUNE</h1>
+            <h2 className="text-xs font-bold text-slate-700">DEPARTMENT OF COMPUTER ENGINEERING</h2>
+            <p className="text-[10px] text-slate-500 mt-0.5">Continuous Assessment & AI Code Validation Viva Performance Report</p>
+          </div>
+          <div className="text-right text-[10px] text-slate-600 space-y-0.5">
+            <p><span className="font-bold">Faculty:</span> {currentUser?.name || 'Prof. Faculty'}</p>
+            <p><span className="font-bold">Academic Year:</span> 2025-2026</p>
+            <p><span className="font-bold">Generated:</span> {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
+          </div>
+        </div>
+      </div>
+
       {/* ==========================================
           POWER BI / NAVIGATION RIBBON
       ========================================== */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-3 shadow-xs flex flex-wrap items-center justify-between gap-3 transition-colors">
+      <div className="no-print bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-3 shadow-xs flex flex-wrap items-center justify-between gap-3 transition-colors">
         
         {/* Navigation Tabs */}
         <div className="flex items-center space-x-1.5 bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl overflow-x-auto max-w-full">
@@ -759,7 +775,7 @@ export default function TeacherPortal({
               </div>
 
               {/* Assignment Filter Dropdown */}
-              <div className="flex items-center space-x-2 bg-white dark:bg-slate-800 px-3.5 py-2 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs card-float shrink-0">
+              <div className="no-print flex items-center space-x-2 bg-white dark:bg-slate-800 px-3.5 py-2 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xs card-float shrink-0">
                 <Filter className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Filter Assignment:</span>
                 <select
@@ -988,7 +1004,7 @@ export default function TeacherPortal({
                 </p>
               </div>
 
-              <div className="relative w-64">
+              <div className="no-print relative w-64">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
                 <input
                   type="text"
@@ -1010,7 +1026,7 @@ export default function TeacherPortal({
                     <th className="px-6 py-3.5">Viva Marks (10 Questions)</th>
                     <th className="px-6 py-3.5">Performance Grade</th>
                     <th className="px-6 py-3.5">GitHub Push</th>
-                    <th className="px-6 py-3.5 text-right">Audit</th>
+                    <th className="no-print px-6 py-3.5 text-right">Audit</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
@@ -1073,7 +1089,7 @@ export default function TeacherPortal({
                               <span className="text-slate-400">Pending</span>
                             )}
                           </td>
-                          <td className="px-6 py-4 text-right">
+                          <td className="no-print px-6 py-4 text-right">
                             <button
                               onClick={() => setSelectedSubmission(sub)}
                               className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition card-float"

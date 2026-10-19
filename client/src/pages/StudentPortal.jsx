@@ -219,6 +219,7 @@ export default function StudentPortal({
   const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
   const [quizResult, setQuizResult] = useState(null);
   const [isSubmittingQuiz, setIsSubmittingQuiz] = useState(false);
+  const [quizAttempt, setQuizAttempt] = useState(1);
 
   // Final submission state
   const [isFinalSubmitting, setIsFinalSubmitting] = useState(false);
@@ -642,8 +643,9 @@ export default function StudentPortal({
   };
 
   // STEP 2: Start Quiz
-  const handleStartQuiz = async () => {
+  const handleStartQuiz = async (overrideAttempt) => {
     setIsGeneratingQuiz(true);
+    const currentAttempt = overrideAttempt !== undefined ? overrideAttempt : quizAttempt;
     try {
       const res = await fetch('/api/quiz/generate', {
         method: 'POST',
@@ -652,7 +654,8 @@ export default function StudentPortal({
           code,
           assignmentId: selectedAssignment.id,
           language: selectedLanguage,
-          studentId: currentUser?.id
+          studentId: currentUser?.id,
+          attempt: currentAttempt
         })
       });
 
@@ -1839,7 +1842,12 @@ export default function StudentPortal({
             </button>
           ) : (
             <button
-              onClick={handleStartQuiz}
+              onClick={() => {
+                const nextAttempt = quizAttempt + 1;
+                setQuizAttempt(nextAttempt);
+                setQuizResult(null);
+                handleStartQuiz(nextAttempt);
+              }}
               className="px-4 py-2 rounded-xl bg-white dark:bg-slate-800 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-xs font-bold hover:bg-red-50 dark:hover:bg-red-900/30 transition shrink-0 card-float"
             >
               Retry 10-Question Viva
@@ -2023,8 +2031,10 @@ export default function StudentPortal({
         isSubmitting={isSubmittingQuiz}
         result={quizResult}
         onResetQuiz={() => {
+          const nextAttempt = quizAttempt + 1;
+          setQuizAttempt(nextAttempt);
           setQuizResult(null);
-          handleStartQuiz();
+          handleStartQuiz(nextAttempt);
         }}
         onProceedToGithub={() => {
           setIsQuizModalOpen(false);
