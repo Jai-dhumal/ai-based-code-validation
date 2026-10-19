@@ -137,45 +137,91 @@ public class Solution {
 
     const hasMain = /int\s+main\s*\(/.test(full) || /void\s+main\s*\(/.test(full);
     if (!hasMain) {
-      const classMatch = full.match(/class\s+([A-Za-z0-9_]+)\s*\{[\s\S]*?([a-zA-Z0-9_<>]+)\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)/);
-      const funcMatch = full.match(/(?:int|bool|void|string|double|auto)\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)/);
+      // Find classes, prioritizing Solution, BinarySearchTree, BST, or classes other than TreeNode/Node
+      const classMatches = [...full.matchAll(/class\s+([A-Za-z0-9_]+)\s*\{([\s\S]*?)\};/g)];
+      let chosenClass = classMatches.find(c => !/^(?:TreeNode|ListNode|Node|Tree)$/i.test(c[1])) || classMatches[0];
 
-      if (classMatch && classMatch[3] !== 'main') {
-        const cName = classMatch[1];
-        const mName = classMatch[3];
-        const isBool = classMatch[2].includes('bool');
-        const driver = `
+      if (chosenClass) {
+        const cName = chosenClass[1];
+        const cBody = chosenClass[2];
+        const methodMatches = [...cBody.matchAll(/(?:public:)?\s*([a-zA-Z0-9_<>*&]+)\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)/g)]
+          .filter(m => m[2] !== cName && !m[2].startsWith('~') && m[2] !== 'main');
+
+        const targetMethod = methodMatches[0];
+        if (targetMethod) {
+          const retType = targetMethod[1].trim();
+          const mName = targetMethod[2].trim();
+          const isVoid = retType === 'void';
+          const isBool = retType === 'bool';
+          const params = targetMethod[3].trim();
+
+          let callLogic = '';
+          if (isVoid) {
+            callLogic = params ? `sol.${mName}(n);\n        cout << "Executed " << "${mName}" << "(" << n << ")" << endl;` : `sol.${mName}();`;
+          } else if (isBool) {
+            callLogic = params 
+              ? `bool res = sol.${mName}(n);\n        cout << (res ? "true" : "false") << endl;`
+              : `bool res = sol.${mName}();\n        cout << (res ? "true" : "false") << endl;`;
+          } else {
+            callLogic = params 
+              ? `auto res = sol.${mName}(n);\n        cout << res << endl;`
+              : `auto res = sol.${mName}();\n        cout << res << endl;`;
+          }
+
+          const driver = `
 int main() {
     ${cName} sol;
-    int n;
+    int n = 0;
     if (cin >> n) {
-        auto res = sol.${mName}(n);
-        ${isBool ? 'cout << (res ? "even" : "odd") << endl;' : 'cout << res << endl;'}
-    }
-    return 0;
-}
-`;
-        full = full + '\n' + driver;
-      } else if (funcMatch && funcMatch[1] !== 'main') {
-        const fName = funcMatch[1];
-        const isBool = funcMatch[0].includes('bool');
-        const driver = `
-int main() {
-    int n;
-    if (cin >> n) {
-        auto res = ${fName}(n);
-        ${isBool ? 'cout << (res ? "even" : "odd") << endl;' : 'cout << res << endl;'}
+        ${callLogic}
     } else {
-        auto res = ${fName}(4);
-        ${isBool ? 'cout << (res ? "even" : "odd") << endl;' : 'cout << res << endl;'}
+        ${callLogic}
     }
     return 0;
 }
 `;
-        full = full + '\n' + driver;
+          full = full + '\n' + driver;
+        } else {
+          full = full + `\nint main() {\n    ${cName} sol;\n    return 0;\n}`;
+        }
       } else {
-        // Raw statements
-        full = full + `\nint main() {\n    int n = 0, a = 0, b = 0;\n    ${raw}\n    return 0;\n}`;
+        const funcMatch = full.match(/(?:int|bool|void|string|double|auto)\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)/);
+        if (funcMatch && funcMatch[1] !== 'main') {
+          const fName = funcMatch[1];
+          const retType = funcMatch[0].split(/\s+/)[0];
+          const isVoid = retType === 'void';
+          const isBool = retType === 'bool';
+          const params = (funcMatch[2] || '').trim();
+
+          let callLogic = '';
+          if (isVoid) {
+            callLogic = params ? `${fName}(n);\n        cout << "Executed " << "${fName}" << "(" << n << ")" << endl;` : `${fName}();`;
+          } else if (isBool) {
+            callLogic = params
+              ? `bool res = ${fName}(n);\n        cout << (res ? "true" : "false") << endl;`
+              : `bool res = ${fName}();\n        cout << (res ? "true" : "false") << endl;`;
+          } else {
+            callLogic = params
+              ? `auto res = ${fName}(n);\n        cout << res << endl;`
+              : `auto res = ${fName}();\n        cout << res << endl;`;
+          }
+
+          const driver = `
+int main() {
+    int n = 0;
+    if (cin >> n) {
+        ${callLogic}
+    } else {
+        ${callLogic}
+    }
+    return 0;
+}
+`;
+          full = full + '\n' + driver;
+        } else {
+          // Raw statements
+          full = full + `\nint main() {\n    int n = 0, a = 0, b = 0;\n    ${raw}\n    return 0;\n}`;
+        }
       }
     }
     return { code: full };

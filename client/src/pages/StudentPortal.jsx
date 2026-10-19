@@ -544,6 +544,11 @@ export default function StudentPortal({
 
   // RUN & COMPILE CODE (Automatic Testcases Execution)
   const handleRunCode = async (customStdin = null, singleCaseIdx = null) => {
+    // Sanitize parameters: prevent React SyntheticEvent from being treated as stdin string
+    if (typeof customStdin !== 'string') {
+      customStdin = null;
+    }
+
     if (!code || !code.trim()) {
       alert('Please enter code before running.');
       return;
@@ -1478,7 +1483,7 @@ export default function StudentPortal({
               </div>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={handleRunCode}
+                  onClick={() => handleRunCode()}
                   disabled={isRunningCode}
                   className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5"
                 >
@@ -1810,7 +1815,7 @@ export default function StudentPortal({
         <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
           <div className="flex items-center gap-2">
             <button
-              onClick={handleRunCode}
+              onClick={() => handleRunCode()}
               disabled={isRunningCode || !code.trim()}
               className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs shadow-sm transition disabled:opacity-50"
             >
