@@ -16,7 +16,8 @@ import {
   XCircle,
   Check,
   Inbox,
-  Clock
+  Clock,
+  RefreshCw
 } from 'lucide-react';
 
 export default function Navbar({ 
@@ -26,7 +27,9 @@ export default function Navbar({
   onOpenProfile,
   isDark,
   onToggleTheme,
-  systemStatus
+  systemStatus,
+  onRefresh,
+  isRefreshing
 }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
@@ -300,6 +303,19 @@ export default function Navbar({
                 </div>
               )}
             </div>
+
+            {/* Application Data Refresh Button */}
+            {onRefresh && (
+              <button
+                onClick={onRefresh}
+                disabled={isRefreshing}
+                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition card-float disabled:opacity-50"
+                title={isRefreshing ? "Refreshing application data..." : "Refresh application data & assignments"}
+                aria-label="Refresh application data"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-indigo-600 dark:text-indigo-400' : ''}`} />
+              </button>
+            )}
 
             {/* Settings Button */}
             <button

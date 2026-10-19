@@ -231,6 +231,24 @@ export default function CompilerPanel({ initialCode = '', initialLanguage = 'pyt
     }
   };
 
+  // ── RESET HANDLER ────────────────────────────────────────────────────────
+  const handleResetCode = () => {
+    try {
+      if (code && code.trim() !== (lang.starter || '').trim()) {
+        const confirmDiscard = window.confirm(
+          "Are you sure you want to reset the editor? All unsaved code and compiler output will be discarded."
+        );
+        if (!confirmDiscard) return;
+      }
+      setCode(lang.starter || '');
+      setOutput(null);
+      setStdin('');
+    } catch (err) {
+      console.error('Compiler reset error:', err);
+      alert('Unable to reset editor: ' + (err.message || 'Unknown error'));
+    }
+  };
+
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl flex flex-col">
@@ -288,9 +306,9 @@ export default function CompilerPanel({ initialCode = '', initialLanguage = 'pyt
 
           {/* Reset */}
           <button
-            onClick={() => { setCode(lang.starter); setOutput(null); }}
+            onClick={handleResetCode}
             className="p-1.5 rounded-lg bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-700 transition"
-            title="Reset to starter code"
+            title="Reset to starter code and clear output"
           >
             <RefreshCw className="w-3.5 h-3.5" />
           </button>

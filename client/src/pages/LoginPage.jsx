@@ -45,6 +45,16 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
   const [emailOtp, setEmailOtp] = useState('');
   const [otpTimer, setOtpTimer] = useState(300);
 
+  // Forgot Password Recovery State
+  const [forgotStep, setForgotStep] = useState('email'); // 'email' | 'otp' | 'new-password'
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotOtp, setForgotOtp] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [forgotTimer, setForgotTimer] = useState(0); // cooldown timer
+  const [forgotOtpExpires, setForgotOtpExpires] = useState(600); // 10 min countdown
+
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -80,6 +90,149 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
     }, 1000);
     return () => clearInterval(interval);
   }, [otpStep, otpTimer]);
+
+  // Forgot Password resend cooldown timer
+  useEffect(() => {
+    if (forgotTimer <= 0) return;
+    const interval = setInterval(() => {
+      setForgotTimer(prev => prev - 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [forgotTimer]);
+
+  // Forgot Password OTP 10-minute expiry countdown
+  useEffect(() => {
+    if (authMode !== 'forgot-password' || forgotStep !== 'otp' || forgotOtpExpires <= 0) return;
+    const interval = setInterval(() => {
+      setForgotOtpExpires(prev => prev - 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [authMode, forgotStep, forgotOtpExpires]);
+
+  // Handle Request Forgot Password OTP (Step 1)
+  const handleRequestForgotOtp = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setIsLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    if (!forgotEmail || !forgotEmail.trim()) {
+      setErrorMsg('Please enter your registered email address.');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail.trim() })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to dispatch verification code');
+      }
+
+      setForgotStep('otp');
+      setForgotTimer(data.cooldownSeconds || 30);
+      setForgotOtpExpires(600);
+      setForgotOtp('');
+      setSuccessMsg(data.message || 'If an account exists for this email, a verification code will be sent.');
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle Verify Forgot Password OTP (Step 2)
+  const handleVerifyForgotOtp = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setIsLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    if (!forgotOtp || forgotOtp.trim().length !== 6) {
+      setErrorMsg('Please enter the 6-digit verification code sent to your email.');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/auth/verify-reset-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail.trim(), otp: forgotOtp.trim() })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Invalid or expired verification code');
+      }
+
+      setResetToken(data.resetToken);
+      setForgotStep('new-password');
+      setSuccessMsg('Verification code confirmed. Please set your new password.');
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle Set New Password (Step 3)
+  const handleSetNewPassword = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    setIsLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    if (!newPassword || newPassword.length < 8) {
+      setErrorMsg('Password must be at least 8 characters long.');
+      setIsLoading(false);
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setErrorMsg('New password and confirm password do not match.');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: forgotEmail.trim(),
+          resetToken,
+          newPassword,
+          confirmPassword: confirmNewPassword
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to update password');
+      }
+
+      setSuccessMsg('Your password has been reset successfully. Please sign in with your new password.');
+      setEmail(forgotEmail.trim());
+      setPassword('');
+      setForgotStep('email');
+      setForgotEmail('');
+      setForgotOtp('');
+      setResetToken('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setAuthMode('signin');
+    } catch (err) {
+      setErrorMsg(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Handle Standard Sign In
   const handleSignIn = async (e) => {
@@ -267,89 +420,93 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
       <div className="sm:mx-auto sm:w-full sm:max-w-xl">
         <div className="bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-3xl p-8 sm:p-10 shadow-xl shadow-slate-200/70 dark:shadow-none backdrop-blur-xl transition-colors">
           
-          {/* Top Mode Switcher (Sign In vs Sign Up) */}
-          <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl mb-6">
-            <button
-              type="button"
-              onClick={() => { setAuthMode('signin'); setOtpStep(false); setErrorMsg(''); setSuccessMsg(''); }}
-              className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
-                authMode === 'signin'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => { 
-                setAuthMode('signup'); 
-                setOtpStep(false);
-                setErrorMsg(''); 
-                setSuccessMsg(''); 
-                if (role === 'admin') setRole('student');
-              }}
-              className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
-                authMode === 'signup'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Create Account
-            </button>
-          </div>
-
-          {/* Role Selector Pill Tabs */}
-          <div className="mb-6">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2.5">
-              Select Your Portal Role
-            </label>
-            <div className={`grid ${authMode === 'signup' ? 'grid-cols-2' : 'grid-cols-3'} gap-2.5`}>
-              {/* Student */}
-              <button
-                type="button"
-                onClick={() => setRole('student')}
-                className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all ${
-                  role === 'student'
-                    ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold shadow-sm'
-                    : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/50 dark:hover:bg-slate-800/50'
-                }`}
-              >
-                <GraduationCap className="w-5 h-5 mb-1" />
-                <span className="text-xs font-bold">Student</span>
-              </button>
-
-              {/* Teacher */}
-              <button
-                type="button"
-                onClick={() => setRole('teacher')}
-                className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all ${
-                  role === 'teacher'
-                    ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold shadow-sm'
-                    : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/50 dark:hover:bg-slate-800/50'
-                }`}
-              >
-                <UserCheck className="w-5 h-5 mb-1" />
-                <span className="text-xs font-bold">Faculty / Teacher</span>
-              </button>
-
-              {/* Admin (Sign In Only) */}
-              {authMode === 'signin' && (
+          {/* Top Mode Switcher (Sign In vs Sign Up) — only when not in forgot-password mode */}
+          {authMode !== 'forgot-password' && (
+            <>
+              <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl mb-6">
                 <button
                   type="button"
-                  onClick={() => setRole('admin')}
-                  className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all ${
-                    role === 'admin'
-                      ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold shadow-sm'
-                      : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/50 dark:hover:bg-slate-800/50'
+                  onClick={() => { setAuthMode('signin'); setOtpStep(false); setErrorMsg(''); setSuccessMsg(''); }}
+                  className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
+                    authMode === 'signin'
+                      ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  <ShieldAlert className="w-5 h-5 mb-1" />
-                  <span className="text-xs font-bold">Admin</span>
+                  Sign In
                 </button>
-              )}
-            </div>
-          </div>
+                <button
+                  type="button"
+                  onClick={() => { 
+                    setAuthMode('signup'); 
+                    setOtpStep(false);
+                    setErrorMsg(''); 
+                    setSuccessMsg(''); 
+                    if (role === 'admin') setRole('student');
+                  }}
+                  className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
+                    authMode === 'signup'
+                      ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  Create Account
+                </button>
+              </div>
+
+              {/* Role Selector Pill Tabs */}
+              <div className="mb-6">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2.5">
+                  Select Your Portal Role
+                </label>
+                <div className={`grid ${authMode === 'signup' ? 'grid-cols-2' : 'grid-cols-3'} gap-2.5`}>
+                  {/* Student */}
+                  <button
+                    type="button"
+                    onClick={() => setRole('student')}
+                    className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all ${
+                      role === 'student'
+                        ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold shadow-sm'
+                        : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/50 dark:hover:bg-slate-800/50'
+                    }`}
+                  >
+                    <GraduationCap className="w-5 h-5 mb-1" />
+                    <span className="text-xs font-bold">Student</span>
+                  </button>
+
+                  {/* Teacher */}
+                  <button
+                    type="button"
+                    onClick={() => setRole('teacher')}
+                    className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all ${
+                      role === 'teacher'
+                        ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold shadow-sm'
+                        : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/50 dark:hover:bg-slate-800/50'
+                    }`}
+                  >
+                    <UserCheck className="w-5 h-5 mb-1" />
+                    <span className="text-xs font-bold">Faculty / Teacher</span>
+                  </button>
+
+                  {/* Admin (Sign In Only) */}
+                  {authMode === 'signin' && (
+                    <button
+                      type="button"
+                      onClick={() => setRole('admin')}
+                      className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all ${
+                        role === 'admin'
+                          ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold shadow-sm'
+                          : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50/50 dark:hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <ShieldAlert className="w-5 h-5 mb-1" />
+                      <span className="text-xs font-bold">Admin</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Alert Messages */}
           {errorMsg && (
@@ -390,9 +547,24 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Password
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode('forgot-password');
+                      setForgotStep('email');
+                      setForgotEmail(email || '');
+                      setErrorMsg('');
+                      setSuccessMsg('');
+                    }}
+                    className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition hover:underline"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
                   <input
@@ -415,6 +587,214 @@ export default function LoginPage({ onLoginSuccess, isDark, onToggleTheme }) {
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
+          )}
+
+          {/* VIEW: FORGOT PASSWORD RECOVERY FLOW */}
+          {authMode === 'forgot-password' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode('signin');
+                    setErrorMsg('');
+                    setSuccessMsg('');
+                  }}
+                  className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Back to Sign In</span>
+                </button>
+                <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                  Password Recovery
+                </div>
+              </div>
+
+              {/* Step 1: Request OTP */}
+              {forgotStep === 'email' && (
+                <form onSubmit={handleRequestForgotOtp} className="space-y-4">
+                  <div className="text-center py-2">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 mx-auto flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-2">
+                      <KeyRound className="w-6 h-6" />
+                    </div>
+                    <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                      Reset Account Password
+                    </h3>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+                      Enter your registered email address to receive a secure 6-digit verification code.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Registered Email Address
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                      <input
+                        type="email"
+                        required
+                        placeholder="e.g. yourname@jspm.edu or yourname@gmail.com"
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        className="w-full pl-10 pr-3.5 py-3 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 focus:border-indigo-600 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-xs focus:outline-none transition font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading || forgotTimer > 0}
+                    className="w-full flex items-center justify-center space-x-2 py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition disabled:opacity-50"
+                  >
+                    <span>{isLoading ? 'Sending Code...' : 'Send Verification Code'}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </form>
+              )}
+
+              {/* Step 2: Verify OTP */}
+              {forgotStep === 'otp' && (
+                <form onSubmit={handleVerifyForgotOtp} className="space-y-4">
+                  <div className="text-center py-2">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 mx-auto flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-2">
+                      <ShieldCheck className="w-6 h-6" />
+                    </div>
+                    <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                      Verify 6-Digit Security Code
+                    </h3>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                      Verification code sent to <strong className="text-slate-800 dark:text-slate-200">{forgotEmail}</strong>
+                    </p>
+                    <div className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 mt-1">
+                      Code expires in: {formatTimer(forgotOtpExpires)}
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-xs text-indigo-900 dark:text-indigo-200 flex items-start gap-2.5">
+                    <Mail className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+                    <div className="space-y-0.5">
+                      <p className="font-bold">Confidential Verification Code Dispatched</p>
+                      <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                        Check your inbox (and Spam/Updates folder) for the 6-digit code.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Enter 6-Digit OTP Code
+                    </label>
+                    <div className="relative">
+                      <Hash className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                      <input
+                        type="text"
+                        required
+                        maxLength="6"
+                        placeholder="••••••"
+                        value={forgotOtp}
+                        onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, ''))}
+                        className="w-full pl-10 pr-3.5 py-3 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 focus:border-indigo-600 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl text-slate-900 dark:text-white text-base focus:outline-none transition font-mono font-bold tracking-widest text-center"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading || forgotOtp.length !== 6}
+                    className="w-full flex items-center justify-center space-x-2 py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition disabled:opacity-50"
+                  >
+                    <span>{isLoading ? 'Verifying Code...' : 'Verify Code'}</span>
+                    <CheckCircle2 className="w-4 h-4" />
+                  </button>
+
+                  <div className="flex items-center justify-between text-xs pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForgotStep('email');
+                        setForgotOtp('');
+                        setErrorMsg('');
+                      }}
+                      className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                    >
+                      Change Email
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRequestForgotOtp}
+                      disabled={isLoading || forgotTimer > 0}
+                      className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline disabled:opacity-50 disabled:no-underline inline-flex items-center gap-1"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>{forgotTimer > 0 ? `Resend in ${forgotTimer}s` : 'Resend Code'}</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Step 3: Set New Password */}
+              {forgotStep === 'new-password' && (
+                <form onSubmit={handleSetNewPassword} className="space-y-4">
+                  <div className="text-center py-2">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 mx-auto flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-2">
+                      <Lock className="w-6 h-6" />
+                    </div>
+                    <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
+                      Create New Password
+                    </h3>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                      Choose a strong password with at least 8 characters.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      New Password
+                    </label>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                      <input
+                        type="password"
+                        required
+                        minLength="8"
+                        placeholder="At least 8 characters"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="w-full pl-10 pr-3.5 py-3 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 focus:border-indigo-600 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-xs focus:outline-none transition font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                      Confirm New Password
+                    </label>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5 pointer-events-none" />
+                      <input
+                        type="password"
+                        required
+                        minLength="8"
+                        placeholder="Re-enter new password"
+                        value={confirmNewPassword}
+                        onChange={(e) => setConfirmNewPassword(e.target.value)}
+                        className="w-full pl-10 pr-3.5 py-3 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 focus:border-indigo-600 dark:focus:border-indigo-500 focus:bg-white dark:focus:bg-slate-800 rounded-xl text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-xs focus:outline-none transition font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading || !newPassword || !confirmNewPassword}
+                    className="w-full flex items-center justify-center space-x-2 py-3.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition disabled:opacity-50"
+                  >
+                    <span>{isLoading ? 'Updating Password...' : 'Update Password & Sign In'}</span>
+                    <CheckCircle2 className="w-4 h-4" />
+                  </button>
+                </form>
+              )}
+            </div>
           )}
 
           {/* VIEW 2: SIGN UP / REGISTRATION FORM */}

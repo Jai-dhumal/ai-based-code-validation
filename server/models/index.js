@@ -173,6 +173,17 @@ export const SettingSchema = new mongoose.Schema({
   defaultMinQuizScore: { type: Number, default: 70 }
 }, schemaOptions);
 
+// 13. Password Reset Recovery Schema
+export const PasswordResetSchema = new mongoose.Schema({
+  email: { type: String, required: true, lowercase: true, trim: true, index: true },
+  otpHash: { type: String, required: true },
+  resetToken: { type: String, default: null, index: true },
+  expiresAt: { type: Date, required: true, index: { expires: 0 } },
+  attempts: { type: Number, default: 0 },
+  verified: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now }
+}, schemaOptions);
+
 // Compile Mongoose Models
 export const User = mongoose.models.User || mongoose.model('User', UserSchema);
 export const Department = mongoose.models.Department || mongoose.model('Department', DepartmentSchema);
@@ -186,3 +197,4 @@ export const Announcement = mongoose.models.Announcement || mongoose.model('Anno
 export const Notification = mongoose.models.Notification || mongoose.model('Notification', NotificationSchema);
 export const ActivityLog = mongoose.models.ActivityLog || mongoose.model('ActivityLog', ActivityLogSchema);
 export const Setting = mongoose.models.Setting || mongoose.model('Setting', SettingSchema);
+export const PasswordReset = mongoose.models.PasswordReset || mongoose.model('PasswordReset', PasswordResetSchema);

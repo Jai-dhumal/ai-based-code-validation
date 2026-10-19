@@ -92,9 +92,18 @@ export default function CodeEditor({
 
           {/* Reset Starter Code */}
           <button
-            onClick={onReset}
+            onClick={() => {
+              if (onReset) {
+                onReset();
+              } else {
+                if (code && code.trim().length > 0) {
+                  if (!window.confirm("Are you sure you want to reset the editor? All unsaved code will be discarded.")) return;
+                }
+                onChange(SAMPLE_CODES.unique.code);
+              }
+            }}
             title="Reset Starter Code"
-            className="p-1 rounded-lg bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-700 transition"
+            className="p-1.5 rounded-lg bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-700 transition"
           >
             <RefreshCw className="w-3.5 h-3.5" />
           </button>

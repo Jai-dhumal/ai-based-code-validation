@@ -229,6 +229,15 @@ export function _getTestOtp(email) {
   return rec ? rec.emailOtp : null;
 }
 
+// In-memory Recovery Store for password reset: email -> { otpHash, expiresAt, attempts, lastRequestedAt, verified, resetToken, _rawOtp }
+const recoveryStore = new Map();
+
+// Helper for password recovery test suite inspection
+export function _getTestResetOtp(email) {
+  const rec = recoveryStore.get(email.trim().toLowerCase());
+  return rec ? rec._rawOtp : null;
+}
+
 // Generate cryptographically secure 6-digit OTP
 function generateOtp() {
   return crypto.randomInt(100000, 1000000).toString();
@@ -494,6 +503,102 @@ export async function sendRealEmailOtp(toEmail, otpCode, role, customTransporter
   }
 }
 
+// Password Reset Recovery Email Dispatcher
+export async function sendPasswordRecoveryEmail(toEmail, otpCode, customTransporter = null) {
+  const mailOptions = {
+    to: toEmail,
+    subject: `🔐 Password Recovery Verification Code: ${otpCode} - JSPM BSIOTR`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 580px; margin: auto; padding: 32px 24px; border: 2px solid #4f46e5; border-radius: 20px; background-color: #ffffff; box-shadow: 0 10px 25px rgba(0,0,0,0.05);">
+        
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #1e1b4b; font-size: 22px; font-weight: 900; line-height: 1.3; margin: 0 0 8px 0; text-transform: uppercase;">
+            JSPM BSIOTR AI CODE VALIDATOR
+          </h1>
+          <p style="color: #4f46e5; font-size: 15px; font-weight: 700; margin: 0; letter-spacing: 0.5px;">
+            Password Recovery Verification
+          </p>
+        </div>
+
+        <div style="background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%); border: 1.5px solid #c7d2fe; border-radius: 16px; padding: 28px 20px; text-align: center; margin-bottom: 24px;">
+          <p style="color: #475569; font-size: 14px; font-weight: 600; margin: 0 0 12px 0;">
+            A password reset was requested for your account. Enter the 6-digit verification code below:
+          </p>
+          <div style="font-size: 42px; font-weight: 900; letter-spacing: 10px; color: #4338ca; font-family: monospace; padding: 14px 0; background: #ffffff; border-radius: 12px; border: 1px dashed #6366f1; display: inline-block; min-width: 260px; margin: 6px auto;">
+            ${otpCode}
+          </div>
+          <p style="color: #dc2626; font-size: 12px; font-weight: 600; margin: 12px 0 0 0;">
+            ⏱ Valid for 10 minutes. If you did not request this, please ignore this email.
+          </p>
+        </div>
+
+        <div style="background-color: #f1f5f9; border-radius: 12px; padding: 12px 16px; text-align: center; margin-bottom: 16px;">
+          <p style="color: #64748b; font-size: 12px; margin: 0;">
+            For your security, never share this verification code with anyone.
+          </p>
+        </div>
+
+        <p style="color: #94a3b8; font-size: 11px; text-align: center; margin: 0;">
+          Dept. of Computer Engineering • JSPM Bhivrabai Sawant Institute of Technology & Research, Wagholi, Pune
+        </p>
+      </div>
+    `
+  };
+
+  const senderUser = process.env.SMTP_USER || process.env.GMAIL_USER;
+
+  // 1. Check Brevo HTTPS API first (Primary for Cloud / Port 443)
+  const brevoApiKey = process.env.BREVO_API_KEY;
+  if (!customTransporter && brevoApiKey) {
+    try {
+      const senderEmail = process.env.BREVO_SENDER_EMAIL || senderUser || 'dhumaljai@gmail.com';
+      const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'api-key': brevoApiKey,
+          'Content-Type': 'application/json',
+          'accept': 'application/json'
+        },
+        body: JSON.stringify({
+          sender: { name: 'JSPM BSIOTR AI Code Validator', email: senderEmail },
+          to: [{ email: toEmail }],
+          subject: mailOptions.subject,
+          htmlContent: mailOptions.html
+        })
+      });
+      const brevoData = await brevoRes.json();
+      if (brevoRes.ok && (brevoData.messageId || brevoData.id)) {
+        console.log(`📧 [PASSWORD RESET EMAIL SENT VIA BREVO] Dispatched to ${toEmail} (ID: ${brevoData.messageId || brevoData.id})`);
+        return { success: true, info: { messageId: brevoData.messageId || brevoData.id } };
+      }
+    } catch (brevoErr) {
+      console.warn(`⚠️ [BREVO RECOVERY ERROR] ${brevoErr.message}. Falling back.`);
+    }
+  }
+
+  // 2. Fallback to SMTP / Nodemailer
+  const transporter = customTransporter || getMailTransporter();
+  if (!transporter) {
+    console.warn(`⚠️ [MAIL WARNING] SMTP credentials not configured. Unable to send recovery email to ${toEmail}`);
+    return { success: false, statusCode: 503, error: 'Mail service not configured' };
+  }
+
+  try {
+    const fromAddress = process.env.SMTP_FROM || (senderUser ? `"JSPM BSIOTR AI Code Validator" <${senderUser}>` : '"JSPM BSIOTR AI Code Validator" <noreply@jspm.edu>');
+    const info = await transporter.sendMail({
+      from: fromAddress,
+      to: toEmail,
+      subject: mailOptions.subject,
+      html: mailOptions.html
+    });
+    console.log(`📧 [PASSWORD RESET EMAIL SENT VIA SMTP] Dispatched to ${toEmail} (ID: ${info.messageId})`);
+    return { success: true, info };
+  } catch (err) {
+    console.error(`❌ [MAIL DISPATCH ERROR] Failed to send password reset email:`, err.message);
+    return { success: false, statusCode: 500, error: err.message };
+  }
+}
+
 // Endpoint: Send OTP for Email verification
 app.post('/api/auth/send-otp', async (req, res) => {
   try {
@@ -638,6 +743,234 @@ app.post('/api/auth/verify-otp', (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: 'OTP verification failed: ' + err.message });
+  }
+});
+
+// ==========================================
+// PASSWORD RECOVERY / FORGOT PASSWORD
+// ==========================================
+
+// Step 1: Request Password Recovery OTP
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email address is required.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+    if (!EMAIL_REGEX.test(cleanEmail)) {
+      return res.status(400).json({ error: 'Please enter a valid email address.' });
+    }
+
+    // Rate limiting: 30-second cooldown between requests
+    const existingSession = recoveryStore.get(cleanEmail);
+    if (existingSession && existingSession.lastRequestedAt && (Date.now() - existingSession.lastRequestedAt < 30000)) {
+      const waitSeconds = Math.ceil((30000 - (Date.now() - existingSession.lastRequestedAt)) / 1000);
+      return res.status(429).json({
+        error: `Please wait ${waitSeconds} seconds before requesting another verification code.`
+      });
+    }
+
+    // Look up user in existing records / MongoDB Atlas
+    const user = db.findUserByEmail(cleanEmail);
+
+    if (user) {
+      const otpCode = generateOtp();
+      const otpHash = crypto.createHash('sha256').update(otpCode).digest('hex');
+      const TTL_SECONDS = 600; // 10 minutes
+      const expiresAt = new Date(Date.now() + TTL_SECONDS * 1000);
+
+      // Save in memory
+      recoveryStore.set(cleanEmail, {
+        otpHash,
+        expiresAt: expiresAt.getTime(),
+        attempts: 0,
+        lastRequestedAt: Date.now(),
+        verified: false,
+        resetToken: null,
+        userId: user.id,
+        _rawOtp: otpCode
+      });
+
+      // Persist recovery session in MongoDB
+      await db.savePasswordReset({
+        email: cleanEmail,
+        otpHash,
+        expiresAt,
+        attempts: 0,
+        verified: false
+      });
+
+      // Dispatch real email via Brevo HTTPS API or SMTP
+      await sendPasswordRecoveryEmail(cleanEmail, otpCode);
+      console.log(`🔐 [PASSWORD RESET] Recovery OTP dispatched for user ${user.id} (${cleanEmail})`);
+    } else {
+      // Record rate limit timestamp even for non-existent email to prevent timing analysis
+      recoveryStore.set(cleanEmail, {
+        lastRequestedAt: Date.now(),
+        expiresAt: 0
+      });
+    }
+
+    // Security requirement: generic response to prevent account enumeration
+    res.json({
+      success: true,
+      message: 'If an account exists for this email, a verification code will be sent.'
+    });
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    res.status(500).json({ error: 'Failed to process password recovery: ' + err.message });
+  }
+});
+
+// Step 2: Verify Recovery OTP Code
+app.post('/api/auth/verify-reset-otp', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ error: 'Email and verification code are required.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    let record = recoveryStore.get(cleanEmail);
+    if (!record) {
+      const mongoRecord = await db.getPasswordReset(cleanEmail);
+      if (mongoRecord) {
+        record = {
+          otpHash: mongoRecord.otpHash,
+          expiresAt: new Date(mongoRecord.expiresAt).getTime(),
+          attempts: mongoRecord.attempts || 0,
+          verified: mongoRecord.verified || false,
+          resetToken: mongoRecord.resetToken || null
+        };
+        recoveryStore.set(cleanEmail, record);
+      }
+    }
+
+    if (!record || !record.otpHash) {
+      return res.status(400).json({ error: 'No active password recovery session found. Please request a new code.' });
+    }
+
+    if (Date.now() > record.expiresAt) {
+      recoveryStore.delete(cleanEmail);
+      await db.deletePasswordReset(cleanEmail);
+      return res.status(400).json({ error: 'Verification code has expired. Please request a new code.' });
+    }
+
+    record.attempts = (record.attempts || 0) + 1;
+
+    // Maximum 5 attempts
+    if (record.attempts > 5) {
+      recoveryStore.delete(cleanEmail);
+      await db.deletePasswordReset(cleanEmail);
+      return res.status(400).json({
+        error: 'Too many incorrect attempts. For security, this code has been invalidated. Please request a new code.'
+      });
+    }
+
+    const enteredHash = crypto.createHash('sha256').update(otp.trim()).digest('hex');
+    if (enteredHash !== record.otpHash) {
+      const remaining = 5 - record.attempts;
+      return res.status(400).json({
+        error: `Invalid verification code. ${remaining > 0 ? `${remaining} attempt${remaining > 1 ? 's' : ''} remaining.` : 'Please request a new code.'}`
+      });
+    }
+
+    // OTP matched! Generate single-use resetToken
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    record.verified = true;
+    record.resetToken = resetToken;
+    record.tokenExpiresAt = Date.now() + 600 * 1000; // 10 minutes to complete password update
+
+    recoveryStore.set(cleanEmail, record);
+    await db.savePasswordReset({
+      email: cleanEmail,
+      otpHash: record.otpHash,
+      resetToken,
+      expiresAt: new Date(record.tokenExpiresAt),
+      attempts: record.attempts,
+      verified: true
+    });
+
+    res.json({
+      success: true,
+      resetToken,
+      message: 'Code verified successfully. Please enter your new password.'
+    });
+  } catch (err) {
+    console.error('Verify reset OTP error:', err);
+    res.status(500).json({ error: 'Code verification failed: ' + err.message });
+  }
+});
+
+// Step 3: Set New Password
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { email, resetToken, newPassword, confirmPassword } = req.body;
+    if (!email || !resetToken || !newPassword) {
+      return res.status(400).json({ error: 'All fields are required.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (confirmPassword !== undefined && newPassword !== confirmPassword) {
+      return res.status(400).json({ error: 'New password and confirm password do not match.' });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters long.' });
+    }
+
+    let record = recoveryStore.get(cleanEmail);
+    if (!record) {
+      const mongoRecord = await db.getPasswordReset(cleanEmail);
+      if (mongoRecord) {
+        record = {
+          resetToken: mongoRecord.resetToken,
+          verified: mongoRecord.verified,
+          tokenExpiresAt: new Date(mongoRecord.expiresAt).getTime()
+        };
+      }
+    }
+
+    if (!record || !record.verified || !record.resetToken || record.resetToken !== resetToken) {
+      return res.status(400).json({
+        error: 'Invalid or unauthorized password reset session. Please start the recovery process again.'
+      });
+    }
+
+    if (record.tokenExpiresAt && Date.now() > record.tokenExpiresAt) {
+      recoveryStore.delete(cleanEmail);
+      await db.deletePasswordReset(cleanEmail);
+      return res.status(400).json({
+        error: 'Password reset session has expired. Please start the recovery process again.'
+      });
+    }
+
+    const user = db.findUserByEmail(cleanEmail);
+    if (!user) {
+      return res.status(404).json({ error: 'User account not found.' });
+    }
+
+    // Hash password with bcrypt
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    db.updateUser(user.id, { password: hashedPassword });
+
+    // Invalidate recovery token immediately (prevent replay)
+    recoveryStore.delete(cleanEmail);
+    await db.deletePasswordReset(cleanEmail);
+
+    console.log(`🔑 [PASSWORD RESET SUCCESSFUL] Password updated for user ${user.id} (${cleanEmail})`);
+
+    res.json({
+      success: true,
+      message: 'Your password has been reset successfully. Please sign in with your new password.'
+    });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ error: 'Failed to reset password: ' + err.message });
   }
 });
 

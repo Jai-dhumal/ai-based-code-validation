@@ -292,14 +292,35 @@ export default function StudentPortal({
     e.target.value = '';
   };
 
-  // Reset editor to official faculty starter template
+  // Reset editor to official faculty starter template and clear compiler/test outputs
   const handleResetStarterCode = () => {
-    const template = selectedAssignment?.starterCode?.[selectedLanguage] || 
-      MULTI_LANG_PRESETS[selectedLanguage]?.starter?.code || 
-      '# Write your solution here\n';
-    setCode(template);
-    setPlagResult(null);
-    setAiReport(null);
+    try {
+      const template = selectedAssignment?.starterCode?.[selectedLanguage] || 
+        STARTER_CODES[selectedLanguage] || 
+        MULTI_LANG_PRESETS[selectedLanguage]?.starter?.code || 
+        '# Write your solution here\n';
+
+      if (code && code.trim() !== template.trim()) {
+        const confirmDiscard = window.confirm(
+          "Are you sure you want to reset the editor? All unsaved code edits, console outputs, and test results will be discarded."
+        );
+        if (!confirmDiscard) return;
+      }
+
+      setCode(template);
+      setConsoleOutput(null);
+      setTestcaseResults(null);
+      setActiveRunningCase(null);
+      setStdinInput('');
+      setPlagResult(null);
+      setAiReport(null);
+      setRealtimeScore(null);
+      setRealtimeStatus(null);
+      setRealtimeVerdict('');
+    } catch (err) {
+      console.error('Reset editor error:', err);
+      alert('Unable to reset editor: ' + (err.message || 'Unknown error occurred'));
+    }
   };
 
   // Debounced Live Code Authenticity Detection as student writes code
@@ -1337,10 +1358,10 @@ export default function StudentPortal({
               type="button"
               onClick={handleResetStarterCode}
               className="flex items-center space-x-1.5 text-[11px] px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-semibold transition shadow-xs card-float"
-              title="Reset code to official assignment starter template"
+              title="Reset code to official starter template and clear console & test results"
             >
               <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
-              <span className="hidden sm:inline">Reset Template</span>
+              <span className="hidden sm:inline">Reset</span>
             </button>
 
             {/* 3. Subtle Test Scenarios Dropdown (Preserved for Viva Demonstration) */}

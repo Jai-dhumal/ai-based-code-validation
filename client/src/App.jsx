@@ -80,8 +80,30 @@ export default function App() {
       }
     } catch (err) {
       console.error('Initial data fetch error:', err);
+      throw err;
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshToast, setRefreshToast] = useState(null);
+
+  // Top header refresh handler
+  const handleRefreshApp = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    setRefreshToast(null);
+    try {
+      await fetchData();
+      setRefreshToast({ type: 'success', message: 'Application data refreshed' });
+      setTimeout(() => setRefreshToast(null), 3000);
+    } catch (err) {
+      console.error('Failed to refresh data:', err);
+      setRefreshToast({ type: 'error', message: err.message || 'Failed to refresh data' });
+      setTimeout(() => setRefreshToast(null), 4000);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -181,7 +203,21 @@ export default function App() {
         systemStatus={systemStatus}
         isDark={isDark}
         onToggleTheme={handleToggleTheme}
+        onRefresh={handleRefreshApp}
+        isRefreshing={isRefreshing}
       />
+
+      {/* Refresh Status Toast */}
+      {refreshToast && (
+        <div className={`fixed bottom-5 right-5 z-50 px-4 py-2.5 rounded-2xl shadow-xl text-xs font-bold flex items-center space-x-2 transition-all ${
+          refreshToast.type === 'error'
+            ? 'bg-rose-600 text-white shadow-rose-600/30'
+            : 'bg-emerald-600 text-white shadow-emerald-600/30'
+        }`}>
+          <span>{refreshToast.type === 'error' ? '⚠️' : '✓'}</span>
+          <span>{refreshToast.message}</span>
+        </div>
+      )}
 
       {/* Main Role-Specific View */}
       <main className="grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">

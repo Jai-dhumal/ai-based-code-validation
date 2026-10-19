@@ -21,7 +21,8 @@ import {
   Announcement,
   Notification,
   ActivityLog,
-  Setting
+  Setting,
+  PasswordReset
 } from './models/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -773,6 +774,57 @@ class Database {
     });
     this.save();
   }
+
+  // --- Password Reset Recovery ---
+  async savePasswordReset(record) {
+    if (!this.data.passwordResets) this.data.passwordResets = [];
+    const cleanEmail = (record.email || '').trim().toLowerCase();
+    const idx = this.data.passwordResets.findIndex(r => r.email === cleanEmail);
+    const item = { ...record, email: cleanEmail };
+    if (idx !== -1) {
+      this.data.passwordResets[idx] = item;
+    } else {
+      this.data.passwordResets.push(item);
+    }
+    this.save();
+    if (this.mongoConnected) {
+      try {
+        await PasswordReset.findOneAndUpdate(
+          { email: cleanEmail },
+          { ...item, expiresAt: new Date(item.expiresAt) },
+          { upsert: true, new: true }
+        );
+      } catch (err) {
+        console.warn('⚠️ [MONGO ERROR] PasswordReset upsert notice:', err.message);
+      }
+    }
+    return item;
+  }
+
+  async getPasswordReset(email) {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    if (this.mongoConnected) {
+      try {
+        const doc = await PasswordReset.findOne({ email: cleanEmail });
+        if (doc) return doc.toObject();
+      } catch (e) {}
+    }
+    if (!this.data.passwordResets) this.data.passwordResets = [];
+    return this.data.passwordResets.find(r => r.email === cleanEmail) || null;
+  }
+
+  async deletePasswordReset(email) {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    if (!this.data.passwordResets) this.data.passwordResets = [];
+    this.data.passwordResets = this.data.passwordResets.filter(r => r.email !== cleanEmail);
+    this.save();
+    if (this.mongoConnected) {
+      try {
+        await PasswordReset.deleteOne({ email: cleanEmail });
+      } catch (e) {}
+    }
+    return true;
+  }
 }
 
 export const db = new Database();
@@ -790,5 +842,6 @@ export {
   Announcement,
   Notification,
   ActivityLog,
-  Setting
+  Setting,
+  PasswordReset
 };
