@@ -1105,6 +1105,89 @@ app.post('/api/compile', async (req, res) => {
   }
 });
 
+// Automated Test Cases Batch Execution Endpoint (/api/compile/testcases)
+app.post('/api/compile/testcases', async (req, res) => {
+  try {
+    const { language = 'python', code = '', testcases = [] } = req.body;
+    if (!code || !code.trim()) {
+      return res.status(400).json({ error: 'Code content is required for execution' });
+    }
+
+    const testcasesToRun = Array.isArray(testcases) && testcases.length > 0 
+      ? testcases 
+      : [{ input: '', expectedOutput: '(Any)' }];
+
+    const results = [];
+    let passedCount = 0;
+
+    for (let i = 0; i < testcasesToRun.length; i++) {
+      const tc = testcasesToRun[i];
+      const tcInput = tc.input != null ? String(tc.input) : '';
+      const tcExpected = (tc.expectedOutput != null ? String(tc.expectedOutput) : '').trim();
+
+      const execResult = await executeCodeInternal({ language, code, stdin: tcInput });
+
+      // If compilation failed, stop immediately and return Compile Error
+      if (execResult.status === 'Compile Error') {
+        results.push({
+          caseIndex: i + 1,
+          input: tcInput,
+          expectedOutput: tcExpected,
+          actualOutput: execResult.stdout,
+          stderr: execResult.stderr,
+          passed: false,
+          status: 'Compile Error',
+          time: execResult.time
+        });
+        return res.json({
+          allPassed: false,
+          hasCompileError: true,
+          compileError: execResult.stderr,
+          total: testcasesToRun.length,
+          passedCount: 0,
+          results
+        });
+      }
+
+      // Check whether actual output matches or contains expected output
+      const actualClean = (execResult.stdout || '').trim();
+      let passed = false;
+      if (execResult.status === 'Accepted') {
+        if (!tcExpected || tcExpected === '(Any)' || tcExpected.toLowerCase() === 'sample output') {
+          passed = true;
+        } else {
+          const expNorm = tcExpected.toLowerCase();
+          const actNorm = actualClean.toLowerCase();
+          passed = actNorm.includes(expNorm) || actNorm === expNorm;
+        }
+      }
+
+      if (passed) passedCount++;
+
+      results.push({
+        caseIndex: i + 1,
+        input: tcInput,
+        expectedOutput: tcExpected,
+        actualOutput: execResult.stdout,
+        stderr: execResult.stderr,
+        passed,
+        status: execResult.status === 'Runtime Error' ? 'Runtime Error' : (passed ? 'Accepted' : 'Wrong Answer'),
+        time: execResult.time
+      });
+    }
+
+    res.json({
+      allPassed: passedCount === testcasesToRun.length,
+      hasCompileError: false,
+      total: testcasesToRun.length,
+      passedCount,
+      results
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Testcases execution failed: ' + err.message });
+  }
+});
+
 // Heartbeat endpoint
 app.post('/api/auth/heartbeat', authenticate, (req, res) => {
   try {

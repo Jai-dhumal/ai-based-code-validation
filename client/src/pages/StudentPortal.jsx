@@ -251,9 +251,15 @@ export default function StudentPortal({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showConsole, setShowConsole] = useState(false);
   const [consoleOutput, setConsoleOutput] = useState(null);
+  const [testcaseResults, setTestcaseResults] = useState(null);
+  const [activeRunningCase, setActiveRunningCase] = useState(null);
   const [isRunningCode, setIsRunningCode] = useState(false);
   const [stdinInput, setStdinInput] = useState('');
   const [consoleTab, setConsoleTab] = useState('testcases'); // 'testcases' | 'stdin' | 'output'
+
+  // Editor and Font References
+  const editorRef = useRef(null);
+  const monacoRef = useRef(null);
 
   // File Upload & Starter Template State
   const fileInputRef = useRef(null);
@@ -366,6 +372,8 @@ export default function StudentPortal({
       setQuizRequestDetails(null);
       setVivaResult(null);
       setVivaCode('');
+      setTestcaseResults(null);
+      setConsoleOutput(null);
 
       // Fetch quiz request status with Authorization header
       fetch(`/api/quiz-requests/status/${selectedAssignment.id}/${currentUser?.id}`, {
@@ -499,8 +507,43 @@ export default function StudentPortal({
     s => s.assignmentId === selectedAssignment.id && s.studentId === currentUser?.id
   );
   const hasSubmittedCurrentAssignment = Boolean(currentSubmission);
-  // RUN & COMPILE CODE (Instant Execution)
-  const handleRunCode = async (customStdin = null) => {
+  // Helper to determine assignment testcases
+  const getTestCases = () => {
+    if (selectedAssignment?.testcases?.length > 0) {
+      return selectedAssignment.testcases;
+    }
+    const lowerTitle = (selectedAssignment?.title || '').toLowerCase();
+    const lowerDesc = (selectedAssignment?.description || '').toLowerCase();
+    if (lowerTitle.includes('even') || lowerDesc.includes('even') || lowerTitle.includes('odd') || lowerDesc.includes('odd')) {
+      return [
+        { input: "4\n6\n", expectedOutput: "even", explanation: "4 is an even number" },
+        { input: "5\n7\n", expectedOutput: "odd", explanation: "5 is an odd number" }
+      ];
+    }
+    if (lowerTitle.includes('binary search tree') || lowerTitle.includes('bst')) {
+      return [
+        { input: "", expectedOutput: "", explanation: "Tests BST tree insertion, search, and in-order traversal logic" }
+      ];
+    }
+    if (lowerTitle.includes('dijkstra') || lowerTitle.includes('shortest path')) {
+      return [
+        { input: "", expectedOutput: "", explanation: "Tests priority queue distance relaxation algorithm" }
+      ];
+    }
+    if (lowerTitle.includes('print') || lowerDesc.includes('print')) {
+      const phrase = lowerTitle.includes('jay ganesh') || lowerDesc.includes('jay ganesh') ? 'Jay Ganesh' : 'Hello World';
+      return [
+        { input: "", expectedOutput: phrase, explanation: `Outputs required phrase "${phrase}"` }
+      ];
+    }
+    return [
+      { input: "10\n", expectedOutput: "10", explanation: "Sample Testcase 1" },
+      { input: "20\n", expectedOutput: "20", explanation: "Sample Testcase 2" }
+    ];
+  };
+
+  // RUN & COMPILE CODE (Automatic Testcases Execution)
+  const handleRunCode = async (customStdin = null, singleCaseIdx = null) => {
     if (!code || !code.trim()) {
       alert('Please enter code before running.');
       return;
@@ -508,31 +551,140 @@ export default function StudentPortal({
 
     setIsRunningCode(true);
     setShowConsole(true);
-    setConsoleTab('output');
-    setConsoleOutput(null);
 
-    const inputToUse = customStdin !== null ? customStdin : (stdinInput || '');
+    // Case A: Custom input execution from stdin tab
+    if (customStdin !== null && singleCaseIdx === null) {
+      setConsoleTab('output');
+      setConsoleOutput(null);
+
+      try {
+        const res = await fetch('/api/compile', {
+          method: 'POST',
+          headers: getAuthHeaders(true),
+          body: JSON.stringify({
+            language: selectedLanguage,
+            code,
+            stdin: customStdin
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Execution failed');
+        setConsoleOutput(data);
+      } catch (err) {
+        setConsoleOutput({
+          stdout: '',
+          stderr: err.message,
+          status: 'Runtime Error',
+          time: '0.00'
+        });
+      } finally {
+        setIsRunningCode(false);
+      }
+      return;
+    }
+
+    // Case B: Run a single specific testcase
+    if (singleCaseIdx !== null) {
+      setActiveRunningCase(singleCaseIdx);
+      try {
+        const res = await fetch('/api/compile', {
+          method: 'POST',
+          headers: getAuthHeaders(true),
+          body: JSON.stringify({
+            language: selectedLanguage,
+            code,
+            stdin: customStdin || ''
+          })
+        });
+        const data = await res.json();
+        const cases = getTestCases();
+        const targetCase = cases[singleCaseIdx];
+        const expected = (targetCase?.expectedOutput || '').trim().toLowerCase();
+        const actual = (data.stdout || '').trim().toLowerCase();
+        const passed = data.status === 'Accepted' && (!expected || expected === '(any)' || actual.includes(expected));
+
+        setTestcaseResults(prev => {
+          const existing = prev?.results ? [...prev.results] : cases.map((c, i) => ({
+            caseIndex: i + 1,
+            input: c.input,
+            expectedOutput: c.expectedOutput,
+            actualOutput: '',
+            stderr: '',
+            passed: false,
+            status: 'Pending'
+          }));
+          existing[singleCaseIdx] = {
+            caseIndex: singleCaseIdx + 1,
+            input: targetCase?.input || '',
+            expectedOutput: targetCase?.expectedOutput || '',
+            actualOutput: data.stdout || '',
+            stderr: data.stderr || '',
+            passed,
+            status: data.status === 'Runtime Error' ? 'Runtime Error' : (passed ? 'Accepted' : 'Wrong Answer'),
+            time: data.time
+          };
+          const passedCount = existing.filter(r => r.passed).length;
+          return {
+            allPassed: passedCount === existing.length,
+            hasCompileError: data.status === 'Compile Error',
+            compileError: data.status === 'Compile Error' ? data.stderr : '',
+            total: existing.length,
+            passedCount,
+            results: existing
+          };
+        });
+      } catch (err) {
+        console.error('Single testcase execution error:', err);
+      } finally {
+        setIsRunningCode(false);
+        setActiveRunningCase(null);
+      }
+      return;
+    }
+
+    // Case C: Main "Run & Compile Code" button — Automatically executes all testcases!
+    setConsoleTab('testcases');
+    const testcases = getTestCases();
 
     try {
-      const res = await fetch('/api/compile', {
+      const res = await fetch('/api/compile/testcases', {
         method: 'POST',
         headers: getAuthHeaders(true),
         body: JSON.stringify({
           language: selectedLanguage,
           code,
-          stdin: inputToUse
+          testcases
         })
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Execution failed');
-      setConsoleOutput(data);
+      setTestcaseResults(data);
+      if (data.hasCompileError) {
+        setConsoleOutput({
+          stdout: '',
+          stderr: data.compileError,
+          status: 'Compile Error',
+          time: '0.00'
+        });
+      }
     } catch (err) {
-      setConsoleOutput({
-        stdout: '',
-        stderr: err.message,
-        status: 'Runtime Error',
-        time: '0.00'
+      setTestcaseResults({
+        allPassed: false,
+        hasCompileError: true,
+        compileError: err.message,
+        total: testcases.length,
+        passedCount: 0,
+        results: testcases.map((tc, i) => ({
+          caseIndex: i + 1,
+          input: tc.input,
+          expectedOutput: tc.expectedOutput,
+          actualOutput: '',
+          stderr: err.message,
+          passed: false,
+          status: 'Runtime Error'
+        }))
       });
     } finally {
       setIsRunningCode(false);
@@ -1369,17 +1521,40 @@ export default function StudentPortal({
               theme="vs-dark"
               value={code}
               onChange={(val) => setCode(val || '')}
+              onMount={(editor, monaco) => {
+                editorRef.current = editor;
+                monacoRef.current = monaco;
+                if (document.fonts && document.fonts.ready) {
+                  document.fonts.ready.then(() => {
+                    try {
+                      monaco.editor.remeasureFonts();
+                      editor.layout();
+                    } catch (e) {}
+                  });
+                }
+                setTimeout(() => {
+                  try {
+                    monaco.editor.remeasureFonts();
+                    editor.layout();
+                  } catch (e) {}
+                }, 200);
+              }}
               options={{
                 minimap: { enabled: false },
                 fontSize: 13,
-                fontFamily: "'Fira Code', 'Consolas', 'Courier New', monospace",
+                fontFamily: "Consolas, 'Courier New', monospace",
+                fontLigatures: false,
+                letterSpacing: 0,
+                lineHeight: 20,
                 lineNumbers: 'on',
                 scrollBeyondLastLine: false,
                 automaticLayout: true,
                 tabSize: 4,
                 bracketPairColorization: { enabled: true },
                 suggestOnTriggerCharacters: true,
-                wordWrap: 'on',
+                wordWrap: 'off',
+                scrollBeyondLastColumn: 2,
+                fixedOverflowWidgets: true,
                 formatOnPaste: true,
                 padding: { top: 12, bottom: 12 }
               }}
@@ -1428,56 +1603,134 @@ export default function StudentPortal({
               {/* TAB 1: TEST CASES & EXAMPLES (LeetCode Style) */}
               {consoleTab === 'testcases' && (
                 <div className="space-y-3">
-                  <p className="text-[11px] text-slate-400">
-                    Run your solution against predefined assignment test cases. Click <strong>"Run with this input"</strong> to pipe values into <code className="text-indigo-300 font-bold">cin &gt;&gt;</code> or <code className="text-indigo-300 font-bold">input()</code>.
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {(selectedAssignment?.testcases?.length > 0 
-                      ? selectedAssignment.testcases
-                      : (selectedAssignment?.title?.toLowerCase().includes('even') || selectedAssignment?.description?.toLowerCase().includes('even'))
-                        ? [
-                            { input: "4\n6\n", expectedOutput: "even", explanation: "4 is an even number" },
-                            { input: "5\n7\n", expectedOutput: "odd", explanation: "5 is an odd number" }
-                          ]
-                        : (selectedAssignment?.title?.toLowerCase().includes('print') || selectedAssignment?.description?.toLowerCase().includes('print'))
-                        ? [
-                            { input: "", expectedOutput: "Jay Ganesh", explanation: "Outputs required phrase" }
-                          ]
-                        : [
-                            { input: "10\n", expectedOutput: "10", explanation: "Sample input 1" },
-                            { input: "20\n", expectedOutput: "20", explanation: "Sample input 2" }
-                          ]
-                    ).map((tc, idx) => (
-                      <div key={idx} className="p-3 bg-slate-900/90 rounded-xl border border-slate-800 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-bold text-slate-300">Case {idx + 1}</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setStdinInput(tc.input || '');
-                              handleRunCode(tc.input || '');
-                            }}
-                            className="px-2 py-0.5 rounded bg-emerald-600/20 border border-emerald-500/40 text-emerald-400 text-[10px] font-bold hover:bg-emerald-600/30 transition flex items-center gap-1"
-                          >
-                            <Play className="w-2.5 h-2.5" />
-                            Run Case
-                          </button>
-                        </div>
-                        <div className="text-[11px]">
-                          <span className="text-slate-500">Input: </span>
-                          <span className="text-emerald-300 font-mono">{tc.input ? JSON.stringify(tc.input).slice(1, -1) : '(None)'}</span>
-                        </div>
-                        <div className="text-[11px]">
-                          <span className="text-slate-500">Expected: </span>
-                          <span className="text-indigo-300 font-mono font-bold">{tc.expectedOutput || '(Any)'}</span>
-                        </div>
-                        {tc.explanation && (
-                          <p className="text-[10px] text-slate-400 italic border-t border-slate-800/80 pt-1">
-                            {tc.explanation}
-                          </p>
-                        )}
+                  {/* Test Cases Execution Status Banner */}
+                  {isRunningCode ? (
+                    <div className="p-3 bg-indigo-950/40 rounded-xl border border-indigo-800/60 flex items-center gap-2 text-indigo-300">
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-400" />
+                      <span className="font-bold text-xs">Compiling & executing against assignment test cases...</span>
+                    </div>
+                  ) : testcaseResults?.hasCompileError ? (
+                    <div className="p-3 bg-rose-950/50 rounded-xl border border-rose-800 text-rose-300 space-y-1">
+                      <div className="flex items-center gap-2 font-bold text-xs text-rose-400">
+                        <AlertTriangle className="w-4 h-4" />
+                        <span>Compilation / Syntax Error</span>
                       </div>
-                    ))}
+                      <pre className="text-[11px] font-mono text-rose-200 whitespace-pre-wrap bg-black/40 p-2 rounded-lg mt-1 max-h-36 overflow-y-auto">
+                        {testcaseResults.compileError}
+                      </pre>
+                    </div>
+                  ) : testcaseResults ? (
+                    <div className={`p-3 rounded-xl border flex items-center justify-between ${
+                      testcaseResults.allPassed 
+                        ? 'bg-emerald-950/40 border-emerald-800/80 text-emerald-300' 
+                        : 'bg-amber-950/40 border-amber-800/80 text-amber-300'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        {testcaseResults.allPassed ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-amber-400" />
+                        )}
+                        <span className="font-bold text-xs">
+                          {testcaseResults.allPassed
+                            ? `All ${testcaseResults.passedCount}/${testcaseResults.total} Test Cases Passed — Accepted!`
+                            : `${testcaseResults.passedCount} of ${testcaseResults.total} Test Cases Passed — Review outputs below`}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono opacity-80">
+                        {testcaseResults.allPassed ? 'Requirements Verified ✓' : 'Output Mismatch ✗'}
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-400">
+                      Click <strong>"Run & Compile Code"</strong> to automatically verify your solution against assignment test cases, or click <strong>"Run Case"</strong> to test individually.
+                    </p>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {getTestCases().map((tc, idx) => {
+                      const res = testcaseResults?.results?.[idx];
+                      const isRunningThis = isRunningCode && (activeRunningCase === idx);
+
+                      return (
+                        <div 
+                          key={idx} 
+                          className={`p-3 rounded-xl border transition space-y-2 ${
+                            res 
+                              ? (res.passed 
+                                  ? 'bg-emerald-950/20 border-emerald-800/60' 
+                                  : 'bg-rose-950/20 border-rose-800/60')
+                              : 'bg-slate-900/90 border-slate-800'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-bold text-slate-300">Case {idx + 1}</span>
+                              {res && (
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                                  res.passed 
+                                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' 
+                                    : res.status === 'Compile Error'
+                                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                                    : 'bg-rose-500/20 text-rose-400 border-rose-500/40'
+                                }`}>
+                                  {res.passed ? '✓ Passed' : res.status === 'Compile Error' ? 'Compile Error' : '✗ Wrong Answer'}
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRunCode(tc.input || '', idx)}
+                              disabled={isRunningCode}
+                              className="px-2 py-0.5 rounded bg-emerald-600/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-600/30 text-[10px] font-bold transition flex items-center gap-1 disabled:opacity-50"
+                            >
+                              <Play className="w-2.5 h-2.5" />
+                              <span>{isRunningThis ? 'Running...' : 'Run Case'}</span>
+                            </button>
+                          </div>
+
+                          <div className="text-[11px]">
+                            <span className="text-slate-500">Input: </span>
+                            <span className="text-emerald-300 font-mono">
+                              {tc.input ? JSON.stringify(tc.input).slice(1, -1) : '(None)'}
+                            </span>
+                          </div>
+
+                          <div className="text-[11px]">
+                            <span className="text-slate-500">Expected: </span>
+                            <span className="text-indigo-300 font-mono font-bold">
+                              {tc.expectedOutput || '(Any)'}
+                            </span>
+                          </div>
+
+                          {/* Actual output from execution */}
+                          {res && (
+                            <div className="text-[11px] pt-1 border-t border-slate-800">
+                              <span className="text-slate-500 block mb-0.5">Your Output:</span>
+                              <pre className={`p-1.5 rounded text-[11px] font-mono whitespace-pre-wrap ${
+                                res.passed 
+                                  ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-900/60' 
+                                  : 'bg-rose-950/40 text-rose-300 border border-rose-900/60'
+                              }`}>
+                                {res.actualOutput || (res.status === 'Compile Error' ? '(Compilation Failed)' : '(No output generated)')}
+                              </pre>
+                              {res.stderr && res.status !== 'Compile Error' && (
+                                <p className="text-[10px] text-rose-400 mt-1 font-mono">{res.stderr}</p>
+                              )}
+                              {res.time && (
+                                <span className="text-[9px] text-slate-500 font-mono block mt-0.5">Runtime: {res.time}s</span>
+                              )}
+                            </div>
+                          )}
+
+                          {tc.explanation && (
+                            <p className="text-[10px] text-slate-400 italic border-t border-slate-800/80 pt-1">
+                              {tc.explanation}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
