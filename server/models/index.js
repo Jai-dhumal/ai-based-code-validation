@@ -53,6 +53,20 @@ export const AssignmentSchema = new mongoose.Schema({
   minQuizScore: { type: Number, default: 70 },
   teacherId: { type: String, default: null, index: true },
   description: { type: String, default: '' },
+  problemStatement: { type: String, default: '' },
+  inputFormat: { type: String, default: '' },
+  outputFormat: { type: String, default: '' },
+  constraints: { type: String, default: '' },
+  examples: [{
+    input: { type: String, default: '' },
+    expectedOutput: { type: String, default: '' },
+    explanation: { type: String, default: '' }
+  }],
+  testcases: [{
+    input: { type: String, default: '' },
+    expectedOutput: { type: String, default: '' },
+    explanation: { type: String, default: '' }
+  }],
   starterCode: { type: mongoose.Schema.Types.Mixed, default: {} },
   department: { type: String, default: 'Computer Engineering', index: true },
   division: { type: String, default: 'all', index: true },

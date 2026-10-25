@@ -235,6 +235,11 @@ export default function StudentPortal({
   const [isLoadingQuizzes, setIsLoadingQuizzes] = useState(false);
   const [activeQuizFilterTab, setActiveQuizFilterTab] = useState('all'); // 'all' | 'available' | 'completed' | 'locked'
 
+  // Fresh Assignment Details State (Ensures clean per-assignment data isolation)
+  const [assignmentDetails, setAssignmentDetails] = useState(null);
+  const [isLoadingAssignmentDetails, setIsLoadingAssignmentDetails] = useState(false);
+  const [assignmentDetailsError, setAssignmentDetailsError] = useState(null);
+
   // Viva Code Editor State
   const [vivaCode, setVivaCode] = useState('');
   const [vivaLanguage, setVivaLanguage] = useState('python');
@@ -295,7 +300,8 @@ export default function StudentPortal({
   // Reset editor to official faculty starter template and clear compiler/test outputs
   const handleResetStarterCode = () => {
     try {
-      const template = selectedAssignment?.starterCode?.[selectedLanguage] || 
+      const activeAsg = assignmentDetails || selectedAssignment;
+      const template = activeAsg?.starterCode?.[selectedLanguage] || 
         STARTER_CODES[selectedLanguage] || 
         MULTI_LANG_PRESETS[selectedLanguage]?.starter?.code || 
         '# Write your solution here\n';
@@ -380,10 +386,52 @@ export default function StudentPortal({
     }
   }, [selectedAssignment]);
 
+  // Fetch fresh Assignment Details whenever selectedAssignment ID changes
+  useEffect(() => {
+    if (!selectedAssignment?.id) {
+      setAssignmentDetails(null);
+      return;
+    }
+    let isCancelled = false;
+    setIsLoadingAssignmentDetails(true);
+    setAssignmentDetails(null);
+    setAssignmentDetailsError(null);
+
+    fetch(`/api/assignments/${selectedAssignment.id}`, {
+      headers: getAuthHeaders()
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Failed to fetch assignment details (Status ${res.status})`);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (!isCancelled) {
+          setAssignmentDetails(data);
+          setIsLoadingAssignmentDetails(false);
+        }
+      })
+      .catch((err) => {
+        if (!isCancelled) {
+          console.warn('Assignment details fetch error:', err);
+          setAssignmentDetailsError(err.message);
+          setIsLoadingAssignmentDetails(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedAssignment?.id]);
+
+  const activeAssignment = assignmentDetails || selectedAssignment;
+
   // Load existing submission or starter code
   useEffect(() => {
-    if (selectedAssignment) {
-      setCode(selectedAssignment.starterCode?.[selectedLanguage] || '# Write your solution here\n');
+    if (activeAssignment) {
+      setCode(activeAssignment.starterCode?.[selectedLanguage] || '# Write your solution here\n');
       setPlagResult(null);
       setAiReport(null);
       setQuizData(null);
@@ -397,24 +445,26 @@ export default function StudentPortal({
       setConsoleOutput(null);
 
       // Fetch quiz request status with Authorization header
-      fetch(`/api/quiz-requests/status/${selectedAssignment.id}/${currentUser?.id}`, {
-        headers: getAuthHeaders()
-      })
-        .then(res => {
-          if (!res.ok) throw new Error('Status fetch failed');
-          return res.json();
+      if (activeAssignment.id && currentUser?.id) {
+        fetch(`/api/quiz-requests/status/${activeAssignment.id}/${currentUser.id}`, {
+          headers: getAuthHeaders()
         })
-        .then(data => {
-          if (data && data.hasRequest) {
-            setQuizRequestStatus(data.status);
-            setQuizRequestDetails(data);
-          }
-        })
-        .catch(err => console.warn('Status check warning:', err));
+          .then(res => {
+            if (!res.ok) throw new Error('Status fetch failed');
+            return res.json();
+          })
+          .then(data => {
+            if (data && data.hasRequest) {
+              setQuizRequestStatus(data.status);
+              setQuizRequestDetails(data);
+            }
+          })
+          .catch(err => console.warn('Status check warning:', err));
+      }
 
       // Check if already submitted
       const existing = submissions.find(
-        s => s.assignmentId === selectedAssignment.id && s.studentId === currentUser?.id
+        s => s.assignmentId === activeAssignment.id && s.studentId === currentUser?.id
       );
       if (existing) {
         setCode(existing.code);
@@ -428,14 +478,14 @@ export default function StudentPortal({
         });
         setQuizResult({
           score: existing.quizScore,
-          passed: existing.quizPassed ?? (existing.quizScore >= (selectedAssignment.minQuizScore || 70)),
-          minRequiredScore: selectedAssignment.minQuizScore || 70,
+          passed: existing.quizPassed ?? (existing.quizScore >= (activeAssignment.minQuizScore || 70)),
+          minRequiredScore: activeAssignment.minQuizScore || 70,
           correctCount: existing.correctAnswers || 7,
           totalQuestions: existing.totalQuestions || 10
         });
       }
     }
-  }, [selectedAssignment, currentUser?.id, submissions, selectedLanguage]);
+  }, [activeAssignment?.id, currentUser?.id, submissions, selectedLanguage]);
 
   // Fetch Available Quizzes
   const fetchStudentQuizzes = async () => {
@@ -528,39 +578,19 @@ export default function StudentPortal({
     s => s.assignmentId === selectedAssignment.id && s.studentId === currentUser?.id
   );
   const hasSubmittedCurrentAssignment = Boolean(currentSubmission);
-  // Helper to determine assignment testcases
+  // Helper to determine assignment testcases (Strictly assignment-specific, never generic fallbacks)
   const getTestCases = () => {
-    if (selectedAssignment?.testcases?.length > 0) {
-      return selectedAssignment.testcases;
+    if (Array.isArray(activeAssignment?.testcases) && activeAssignment.testcases.length > 0) {
+      return activeAssignment.testcases;
     }
-    const lowerTitle = (selectedAssignment?.title || '').toLowerCase();
-    const lowerDesc = (selectedAssignment?.description || '').toLowerCase();
-    if (lowerTitle.includes('even') || lowerDesc.includes('even') || lowerTitle.includes('odd') || lowerDesc.includes('odd')) {
-      return [
-        { input: "4\n6\n", expectedOutput: "even", explanation: "4 is an even number" },
-        { input: "5\n7\n", expectedOutput: "odd", explanation: "5 is an odd number" }
-      ];
+    if (Array.isArray(activeAssignment?.examples) && activeAssignment.examples.length > 0) {
+      return activeAssignment.examples.map(ex => ({
+        input: ex.input || '',
+        expectedOutput: ex.expectedOutput || '',
+        explanation: ex.explanation || ''
+      }));
     }
-    if (lowerTitle.includes('binary search tree') || lowerTitle.includes('bst')) {
-      return [
-        { input: "", expectedOutput: "", explanation: "Tests BST tree insertion, search, and in-order traversal logic" }
-      ];
-    }
-    if (lowerTitle.includes('dijkstra') || lowerTitle.includes('shortest path')) {
-      return [
-        { input: "", expectedOutput: "", explanation: "Tests priority queue distance relaxation algorithm" }
-      ];
-    }
-    if (lowerTitle.includes('print') || lowerDesc.includes('print')) {
-      const phrase = lowerTitle.includes('jay ganesh') || lowerDesc.includes('jay ganesh') ? 'Jay Ganesh' : 'Hello World';
-      return [
-        { input: "", expectedOutput: phrase, explanation: `Outputs required phrase "${phrase}"` }
-      ];
-    }
-    return [
-      { input: "10\n", expectedOutput: "10", explanation: "Sample Testcase 1" },
-      { input: "20\n", expectedOutput: "20", explanation: "Sample Testcase 2" }
-    ];
+    return [];
   };
 
   // RUN & COMPILE CODE (Automatic Testcases Execution)
@@ -670,8 +700,38 @@ export default function StudentPortal({
     }
 
     // Case C: Main "Run & Compile Code" button — Automatically executes all testcases!
-    setConsoleTab('testcases');
     const testcases = getTestCases();
+
+    if (testcases.length === 0) {
+      // If assignment has no predefined testcases, execute program directly and display stdout/stderr in Output tab
+      setConsoleTab('output');
+      try {
+        setIsRunningCode(true);
+        const res = await fetch('/api/compile/run', {
+          method: 'POST',
+          headers: getAuthHeaders(true),
+          body: JSON.stringify({
+            language: selectedLanguage,
+            code,
+            stdin: stdinInput || ''
+          })
+        });
+        const data = await res.json();
+        setConsoleOutput(data);
+      } catch (err) {
+        setConsoleOutput({
+          status: 'Execution Error',
+          stderr: err.message,
+          stdout: '',
+          time: '0.00'
+        });
+      } finally {
+        setIsRunningCode(false);
+      }
+      return;
+    }
+
+    setConsoleTab('testcases');
 
     try {
       const res = await fetch('/api/compile/testcases', {
@@ -1229,25 +1289,49 @@ export default function StudentPortal({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center space-x-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-1">
-              <span>{selectedAssignment.code}</span>
+              <span>{activeAssignment.code}</span>
               <span>•</span>
-              <span>{selectedAssignment.subject}</span>
+              <span>{activeAssignment.subject}</span>
+              {activeAssignment.division && (
+                <>
+                  <span>•</span>
+                  <span className="text-slate-500 font-medium">Division {activeAssignment.division}</span>
+                </>
+              )}
             </div>
             <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
-              {selectedAssignment.title}
+              {activeAssignment.title}
             </h2>
             <p className="text-xs text-slate-600 dark:text-slate-400 mt-1.5 leading-relaxed">
-              {selectedAssignment.description}
+              {activeAssignment.problemStatement || activeAssignment.description}
             </p>
+            {activeAssignment.inputFormat && (
+              <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">
+                <span className="font-bold text-slate-700 dark:text-slate-300">Input Format: </span>
+                <span>{activeAssignment.inputFormat}</span>
+              </div>
+            )}
+            {activeAssignment.outputFormat && (
+              <div className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                <span className="font-bold text-slate-700 dark:text-slate-300">Output Format: </span>
+                <span>{activeAssignment.outputFormat}</span>
+              </div>
+            )}
+            {activeAssignment.constraints && (
+              <div className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                <span className="font-bold text-slate-700 dark:text-slate-300">Constraints: </span>
+                <span className="font-mono text-[11px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-300">{activeAssignment.constraints}</span>
+              </div>
+            )}
           </div>
 
           <div className="flex sm:flex-col items-end justify-between gap-2 shrink-0">
             <span className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
               <Clock className="w-3.5 h-3.5" />
-              Deadline: {new Date(selectedAssignment.deadline).toLocaleDateString()}
+              Deadline: {activeAssignment.deadline ? new Date(activeAssignment.deadline).toLocaleDateString() : 'N/A'}
             </span>
             <span className="text-xs px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold border border-indigo-200 dark:border-indigo-800">
-              Quiz Pass Mark: {selectedAssignment.minQuizScore}%
+              Quiz Pass Mark: {activeAssignment.minQuizScore}%
             </span>
           </div>
         </div>
@@ -1256,43 +1340,51 @@ export default function StudentPortal({
         <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
           <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-2 flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-            <span>Example Specifications &amp; Expected Outputs (LeetCode Style):</span>
+            <span>Example Specifications &amp; Expected Outputs:</span>
           </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {(selectedAssignment?.testcases?.length > 0 
-              ? selectedAssignment.testcases 
-              : (selectedAssignment?.title?.toLowerCase().includes('even') || selectedAssignment?.description?.toLowerCase().includes('even'))
-                ? [
-                    { input: "4\n6\n", expectedOutput: "The first number is even", explanation: "First number 4 is divisible by 2" },
-                    { input: "5\n7\n", expectedOutput: "The first number is odd", explanation: "First number 5 is odd" }
-                  ]
-                : (selectedAssignment?.title?.toLowerCase().includes('print') || selectedAssignment?.description?.toLowerCase().includes('print'))
-                ? [
-                    { input: "(none)", expectedOutput: "Jay Ganesh", explanation: "Outputs required phrase to stdout" }
-                  ]
-                : [
-                    { input: "10\n", expectedOutput: "10", explanation: "Sample input 1" },
-                    { input: "20\n", expectedOutput: "20", explanation: "Sample input 2" }
-                  ]
-            ).map((tc, idx) => (
-              <div key={idx} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-xs font-mono">
-                <span className="font-bold text-indigo-600 dark:text-indigo-400">Example {idx + 1}:</span>
-                <div className="text-[11px] text-slate-700 dark:text-slate-300 mt-1">
-                  <span className="text-slate-500 font-sans font-medium">Input (stdin): </span>
-                  <code className="text-emerald-600 dark:text-emerald-400 font-bold">{tc.input ? JSON.stringify(tc.input).slice(1, -1) : '(None)'}</code>
+          {isLoadingAssignmentDetails ? (
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-500" />
+              <span>Loading assignment specifications...</span>
+            </div>
+          ) : (() => {
+            const assignmentExamples = (Array.isArray(activeAssignment?.examples) && activeAssignment.examples.length > 0)
+              ? activeAssignment.examples
+              : (Array.isArray(activeAssignment?.testcases) && activeAssignment.testcases.length > 0)
+                ? activeAssignment.testcases
+                : [];
+            
+            if (assignmentExamples.length === 0) {
+              return (
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 text-xs text-slate-500 dark:text-slate-400">
+                  No sample input/output examples configured for this assignment.
                 </div>
-                <div className="text-[11px] text-slate-700 dark:text-slate-300 mt-0.5">
-                  <span className="text-slate-500 font-sans font-medium">Expected Output: </span>
-                  <code className="text-indigo-600 dark:text-indigo-400 font-bold">{tc.expectedOutput}</code>
-                </div>
-                {tc.explanation && (
-                  <div className="text-[10px] text-slate-500 font-sans italic mt-1">
-                    {tc.explanation}
+              );
+            }
+
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {assignmentExamples.map((tc, idx) => (
+                  <div key={idx} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-xs font-mono">
+                    <span className="font-bold text-indigo-600 dark:text-indigo-400">Example {idx + 1}:</span>
+                    <div className="text-[11px] text-slate-700 dark:text-slate-300 mt-1">
+                      <span className="text-slate-500 font-sans font-medium">Input (stdin): </span>
+                      <code className="text-emerald-600 dark:text-emerald-400 font-bold">{tc.input ? JSON.stringify(tc.input).slice(1, -1) : '(None)'}</code>
+                    </div>
+                    <div className="text-[11px] text-slate-700 dark:text-slate-300 mt-0.5">
+                      <span className="text-slate-500 font-sans font-medium">Expected Output: </span>
+                      <code className="text-indigo-600 dark:text-indigo-400 font-bold">{tc.expectedOutput || '(None)'}</code>
+                    </div>
+                    {tc.explanation && (
+                      <div className="text-[10px] text-slate-500 font-sans italic mt-1">
+                        {tc.explanation}
+                      </div>
+                    )}
                   </div>
-                )}
+                ))}
               </div>
-            ))}
-          </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -1599,7 +1691,7 @@ export default function StudentPortal({
                       onClick={() => setConsoleTab('testcases')}
                       className={`px-2.5 py-1 rounded text-[11px] font-bold transition ${consoleTab === 'testcases' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
                     >
-                      🧪 Test Cases ({((selectedAssignment?.testcases?.length) || 2)})
+                      🧪 Test Cases ({getTestCases().length})
                     </button>
                     <button
                       type="button"
@@ -1673,91 +1765,98 @@ export default function StudentPortal({
                     </p>
                   )}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {getTestCases().map((tc, idx) => {
-                      const res = testcaseResults?.results?.[idx];
-                      const isRunningThis = isRunningCode && (activeRunningCase === idx);
+                  {getTestCases().length === 0 ? (
+                    <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-center text-xs text-slate-400">
+                      <p className="font-medium text-slate-300">No pre-configured test cases for this assignment.</p>
+                      <p className="text-[11px] text-slate-500 mt-1">You can test your code with custom inputs using the <strong>Custom Input (stdin)</strong> tab.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {getTestCases().map((tc, idx) => {
+                        const res = testcaseResults?.results?.[idx];
+                        const isRunningThis = isRunningCode && (activeRunningCase === idx);
 
-                      return (
-                        <div 
-                          key={idx} 
-                          className={`p-3 rounded-xl border transition space-y-2 ${
-                            res 
-                              ? (res.passed 
-                                  ? 'bg-emerald-950/20 border-emerald-800/60' 
-                                  : 'bg-rose-950/20 border-rose-800/60')
-                              : 'bg-slate-900/90 border-slate-800'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[11px] font-bold text-slate-300">Case {idx + 1}</span>
-                              {res && (
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                        return (
+                          <div 
+                            key={idx} 
+                            className={`p-3 rounded-xl border transition space-y-2 ${
+                              res 
+                                ? (res.passed 
+                                    ? 'bg-emerald-950/20 border-emerald-800/60' 
+                                    : 'bg-rose-950/20 border-rose-800/60')
+                                : 'bg-slate-900/90 border-slate-800'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-bold text-slate-300">Case {idx + 1}</span>
+                                {res && (
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                                    res.passed 
+                                      ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' 
+                                      : res.status === 'Compile Error'
+                                      ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                                      : 'bg-rose-500/20 text-rose-400 border-rose-500/40'
+                                  }`}>
+                                    {res.passed ? '✓ Passed' : res.status === 'Compile Error' ? 'Compile Error' : '✗ Wrong Answer'}
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRunCode(tc.input || '', idx)}
+                                disabled={isRunningCode}
+                                className="px-2 py-0.5 rounded bg-emerald-600/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-600/30 text-[10px] font-bold transition flex items-center gap-1 disabled:opacity-50"
+                              >
+                                <Play className="w-2.5 h-2.5" />
+                                <span>{isRunningThis ? 'Running...' : 'Run Case'}</span>
+                              </button>
+                            </div>
+
+                            <div className="text-[11px]">
+                              <span className="text-slate-500">Input: </span>
+                              <span className="text-emerald-300 font-mono">
+                                {tc.input ? JSON.stringify(tc.input).slice(1, -1) : '(None)'}
+                              </span>
+                            </div>
+
+                            <div className="text-[11px]">
+                              <span className="text-slate-500">Expected: </span>
+                              <span className="text-indigo-300 font-mono font-bold">
+                                {tc.expectedOutput || '(Any)'}
+                              </span>
+                            </div>
+
+                            {/* Actual output from execution */}
+                            {res && (
+                              <div className="text-[11px] pt-1 border-t border-slate-800">
+                                <span className="text-slate-500 block mb-0.5">Your Output:</span>
+                                <pre className={`p-1.5 rounded text-[11px] font-mono whitespace-pre-wrap ${
                                   res.passed 
-                                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' 
-                                    : res.status === 'Compile Error'
-                                    ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
-                                    : 'bg-rose-500/20 text-rose-400 border-rose-500/40'
+                                    ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-900/60' 
+                                    : 'bg-rose-950/40 text-rose-300 border border-rose-900/60'
                                 }`}>
-                                  {res.passed ? '✓ Passed' : res.status === 'Compile Error' ? 'Compile Error' : '✗ Wrong Answer'}
-                                </span>
-                              )}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleRunCode(tc.input || '', idx)}
-                              disabled={isRunningCode}
-                              className="px-2 py-0.5 rounded bg-emerald-600/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-600/30 text-[10px] font-bold transition flex items-center gap-1 disabled:opacity-50"
-                            >
-                              <Play className="w-2.5 h-2.5" />
-                              <span>{isRunningThis ? 'Running...' : 'Run Case'}</span>
-                            </button>
+                                  {res.actualOutput || (res.status === 'Compile Error' ? '(Compilation Failed)' : '(No output generated)')}
+                                </pre>
+                                {res.stderr && res.status !== 'Compile Error' && (
+                                  <p className="text-[10px] text-rose-400 mt-1 font-mono">{res.stderr}</p>
+                                )}
+                                {res.time && (
+                                  <span className="text-[9px] text-slate-500 font-mono block mt-0.5">Runtime: {res.time}s</span>
+                                )}
+                              </div>
+                            )}
+
+                            {tc.explanation && (
+                              <p className="text-[10px] text-slate-400 italic border-t border-slate-800/80 pt-1">
+                                {tc.explanation}
+                              </p>
+                            )}
                           </div>
-
-                          <div className="text-[11px]">
-                            <span className="text-slate-500">Input: </span>
-                            <span className="text-emerald-300 font-mono">
-                              {tc.input ? JSON.stringify(tc.input).slice(1, -1) : '(None)'}
-                            </span>
-                          </div>
-
-                          <div className="text-[11px]">
-                            <span className="text-slate-500">Expected: </span>
-                            <span className="text-indigo-300 font-mono font-bold">
-                              {tc.expectedOutput || '(Any)'}
-                            </span>
-                          </div>
-
-                          {/* Actual output from execution */}
-                          {res && (
-                            <div className="text-[11px] pt-1 border-t border-slate-800">
-                              <span className="text-slate-500 block mb-0.5">Your Output:</span>
-                              <pre className={`p-1.5 rounded text-[11px] font-mono whitespace-pre-wrap ${
-                                res.passed 
-                                  ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-900/60' 
-                                  : 'bg-rose-950/40 text-rose-300 border border-rose-900/60'
-                              }`}>
-                                {res.actualOutput || (res.status === 'Compile Error' ? '(Compilation Failed)' : '(No output generated)')}
-                              </pre>
-                              {res.stderr && res.status !== 'Compile Error' && (
-                                <p className="text-[10px] text-rose-400 mt-1 font-mono">{res.stderr}</p>
-                              )}
-                              {res.time && (
-                                <span className="text-[9px] text-slate-500 font-mono block mt-0.5">Runtime: {res.time}s</span>
-                              )}
-                            </div>
-                          )}
-
-                          {tc.explanation && (
-                            <p className="text-[10px] text-slate-400 italic border-t border-slate-800/80 pt-1">
-                              {tc.explanation}
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1901,7 +2000,7 @@ export default function StudentPortal({
                     </div>
                   )}
                   <p className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold mt-2.5">
-                    👉 Please update your program so that it prints or computes the actual expected output for "{selectedAssignment.title}". Once your output matches requirements, you can proceed to the viva quiz.
+                    👉 Please update your program so that it prints or computes the actual expected output for "{activeAssignment?.title || selectedAssignment?.title}". Once your output matches requirements, you can proceed to the viva quiz.
                   </p>
                 </div>
               </div>
@@ -2100,7 +2199,7 @@ export default function StudentPortal({
               <span>
                 {quizResult.passed 
                   ? `Quiz Passed! You scored ${quizResult.score}% (${quizResult.correctCount}/${quizResult.totalQuestions} correct)` 
-                  : `Score: ${quizResult.score}% (${quizResult.correctCount}/${quizResult.totalQuestions} correct). Required: ${selectedAssignment.minQuizScore}% (7/10).`}
+                  : `Score: ${quizResult.score}% (${quizResult.correctCount}/${quizResult.totalQuestions} correct). Required: ${activeAssignment?.minQuizScore || selectedAssignment?.minQuizScore}% (7/10).`}
               </span>
             </h4>
             <p className="text-xs mt-0.5 opacity-80">

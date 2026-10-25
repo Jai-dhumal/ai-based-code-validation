@@ -132,9 +132,18 @@ const defaultData = {
       code: 'CS201',
       deadline: '2026-10-30',
       languages: ['cpp', 'java', 'python'],
+      department: 'Computer Engineering',
+      division: 'all',
+      divisions: ['A', 'B', 'C'],
       minQuizScore: 70,
       teacherId: 'usr_teacher_1',
       description: 'Implement a BST with insert, delete, search, and in-order traversal operations.',
+      problemStatement: 'Implement a Binary Search Tree (BST) supporting insert(val), search(val), and in_order_traversal(). Optimize for clean recursion and edge handling (empty tree, duplicates).',
+      inputFormat: 'Method calls on BinarySearchTree instance: insert(val), search(val), in_order()',
+      outputFormat: 'Return values from respective methods.',
+      constraints: 'Node values are integers. Up to 10^4 total tree operations.',
+      examples: [],
+      testcases: [],
       starterCode: {
         python: 'class TreeNode:\n    def __init__(self, val=0):\n        self.val = val\n        self.left = None\n        self.right = None\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n\n    def insert(self, val):\n        # TODO: Implement insert\n        pass\n\n    def search(self, val):\n        # TODO: Implement search\n        return False\n\n    def in_order(self):\n        # TODO: Return list of values\n        return []\n',
         cpp: '#include <iostream>\n#include <vector>\n\nstruct TreeNode {\n    int val;\n    TreeNode* left;\n    TreeNode* right;\n    TreeNode(int v) : val(v), left(nullptr), right(nullptr) {}\n};\n\nclass BinarySearchTree {\npublic:\n    TreeNode* root = nullptr;\n    void insert(int val);\n    bool search(int val);\n    std::vector<int> inOrder();\n};\n'
@@ -147,13 +156,61 @@ const defaultData = {
       code: 'CS301',
       deadline: '2026-11-15',
       languages: ['cpp', 'java', 'python'],
+      department: 'Computer Engineering',
+      division: 'all',
+      divisions: ['A', 'B', 'C'],
       minQuizScore: 70,
       teacherId: 'usr_teacher_1',
       description: 'Implement Dijkstra algorithm using adjacency list and priority queue (min-heap).',
+      problemStatement: 'Implement Dijkstra Single Source Shortest Path on a weighted graph using an adjacency list and min-heap.',
+      inputFormat: 'Graph adjacency list and start node.',
+      outputFormat: 'Dictionary or array of shortest distances from start node to all reachable nodes.',
+      constraints: '1 <= V <= 10^4, 0 <= E <= 10^5, non-negative edge weights.',
+      examples: [],
+      testcases: [],
       starterCode: {
         python: 'import heapq\n\ndef dijkstra(graph, start):\n    # TODO: Implement Dijkstra\n    # graph is dict: {node: [(neighbor, weight), ...]}\n    return {}\n',
         cpp: '#include <iostream>\n#include <vector>\n#include <queue>\n\n// TODO: Implement Dijkstra using priority_queue\n'
       }
+    },
+    {
+      id: 'asg_3',
+      title: 'Find Greatest of Two Numbers',
+      subject: 'Programming Fundamentals',
+      code: 'CS302',
+      deadline: '2026-11-15',
+      languages: ['cpp', 'java', 'python', 'c'],
+      department: 'Computer Engineering',
+      division: 'all',
+      divisions: ['A', 'B', 'C'],
+      minQuizScore: 70,
+      teacherId: 'usr_teacher_1',
+      description: 'Write a program to accept two integers from standard input and output the greatest of the two numbers.',
+      problemStatement: 'Write a program that takes two integers separated by whitespace or newline as input and prints the greater of the two numbers to standard output.',
+      inputFormat: 'Two space or newline separated integers, A and B.',
+      outputFormat: 'A single integer representing the maximum of A and B.',
+      constraints: '-10^9 <= A, B <= 10^9',
+      examples: [
+        {
+          input: '10 20',
+          expectedOutput: '20',
+          explanation: 'Between 10 and 20, 20 is the greatest.'
+        }
+      ],
+      testcases: [
+        {
+          input: '10 20',
+          expectedOutput: '20',
+          explanation: 'Between 10 and 20, 20 is the greatest.'
+        }
+      ],
+      starterCode: {
+        python: '# Read two numbers and print the greatest\nimport sys\n\ndef main():\n    nums = sys.stdin.read().split()\n    if len(nums) >= 2:\n        a, b = int(nums[0]), int(nums[1])\n        print(max(a, b))\n\nif __name__ == "__main__":\n    main()\n',
+        cpp: '#include <iostream>\nusing namespace std;\n\nint main() {\n    long long a, b;\n    if (cin >> a >> b) {\n        cout << (a > b ? a : b) << endl;\n    }\n    return 0;\n}\n'
+      },
+      department: 'Computer Engineering',
+      division: 'all',
+      divisions: ['A', 'B', 'C']
     }
   ],
   submissions: [
@@ -287,6 +344,63 @@ class Database {
           if (u.role === 'student' && !u.division) { u.division = 'A'; modified = true; }
           if (u.role === 'teacher' && !u.divisions) { u.divisions = ['A']; modified = true; }
         });
+
+        // Migrate assignments: ensure testcases and examples arrays, problemStatement, etc.
+        if (!this.data.assignments || !Array.isArray(this.data.assignments)) {
+          this.data.assignments = JSON.parse(JSON.stringify(defaultData.assignments));
+          modified = true;
+        } else {
+          (this.data.assignments || []).forEach(a => {
+            if (!Array.isArray(a.examples)) {
+              a.examples = Array.isArray(a.testcases) ? [...a.testcases] : [];
+              modified = true;
+            }
+            if (!Array.isArray(a.testcases)) {
+              a.testcases = Array.isArray(a.examples) ? [...a.examples] : [];
+              modified = true;
+            }
+            if (a.problemStatement === undefined) {
+              a.problemStatement = a.description || '';
+              modified = true;
+            }
+            if (a.inputFormat === undefined) {
+              a.inputFormat = '';
+              modified = true;
+            }
+            if (a.outputFormat === undefined) {
+              a.outputFormat = '';
+              modified = true;
+            }
+            if (a.constraints === undefined) {
+              a.constraints = '';
+              modified = true;
+            }
+            if (!a.department) {
+              a.department = 'Computer Engineering';
+              modified = true;
+            }
+            if (!a.division) {
+              a.division = 'all';
+              modified = true;
+            }
+            if (!Array.isArray(a.divisions) || a.divisions.length === 0) {
+              a.divisions = ['A', 'B', 'C'];
+              modified = true;
+            }
+          });
+
+          // Ensure asg_3 ('Find Greatest of Two Numbers') exists in assignments
+          const hasGreatest = (this.data.assignments || []).some(a =>
+            a.id === 'asg_3' || a.title?.toLowerCase().includes('greatest')
+          );
+          if (!hasGreatest) {
+            const defaultAsg3 = defaultData.assignments.find(a => a.id === 'asg_3');
+            if (defaultAsg3) {
+              this.data.assignments.push(JSON.parse(JSON.stringify(defaultAsg3)));
+              modified = true;
+            }
+          }
+        }
 
         if (modified) {
           this.save();
@@ -450,20 +564,61 @@ class Database {
   }
 
   getAssignmentById(id) {
-    return this.data.assignments.find(a => a.id === id);
+    if (!id || typeof id !== 'string') return null;
+    return this.data.assignments.find(a => a.id === id.trim());
   }
 
   addAssignment(asg) {
-    this.data.assignments.push(asg);
+    const rawExamples = Array.isArray(asg.examples) ? asg.examples : (Array.isArray(asg.testcases) ? asg.testcases : []);
+    const sanitizedExamples = rawExamples.map(ex => ({
+      input: typeof ex.input === 'string' ? ex.input : String(ex.input ?? ''),
+      expectedOutput: typeof ex.expectedOutput === 'string' ? ex.expectedOutput : String(ex.expectedOutput ?? ''),
+      explanation: typeof ex.explanation === 'string' ? ex.explanation : String(ex.explanation ?? '')
+    }));
+
+    const sanitizedAsg = {
+      ...asg,
+      problemStatement: asg.problemStatement || asg.description || '',
+      inputFormat: asg.inputFormat || '',
+      outputFormat: asg.outputFormat || '',
+      constraints: asg.constraints || '',
+      examples: sanitizedExamples,
+      testcases: sanitizedExamples
+    };
+
+    this.data.assignments.push(sanitizedAsg);
     this.save();
-    this.persistToMongo(Assignment, asg);
-    return asg;
+    this.persistToMongo(Assignment, sanitizedAsg);
+    return sanitizedAsg;
   }
 
   updateAssignment(id, fields) {
-    const idx = this.data.assignments.findIndex(a => a.id === id);
+    if (!id || typeof id !== 'string') return null;
+    const cleanId = id.trim();
+    const idx = this.data.assignments.findIndex(a => a.id === cleanId);
     if (idx === -1) return null;
-    this.data.assignments[idx] = { ...this.data.assignments[idx], ...fields };
+
+    const { id: _ignoreId, ...safeFields } = fields || {};
+
+    if (safeFields.examples !== undefined || safeFields.testcases !== undefined) {
+      const raw = Array.isArray(safeFields.examples)
+        ? safeFields.examples
+        : (Array.isArray(safeFields.testcases) ? safeFields.testcases : []);
+      const sanitized = raw.map(ex => ({
+        input: typeof ex.input === 'string' ? ex.input : String(ex.input ?? ''),
+        expectedOutput: typeof ex.expectedOutput === 'string' ? ex.expectedOutput : String(ex.expectedOutput ?? ''),
+        explanation: typeof ex.explanation === 'string' ? ex.explanation : String(ex.explanation ?? '')
+      }));
+      safeFields.examples = sanitized;
+      safeFields.testcases = sanitized;
+    }
+
+    this.data.assignments[idx] = {
+      ...this.data.assignments[idx],
+      ...safeFields,
+      id: cleanId // Guarantee id is immutable
+    };
+
     this.save();
     this.persistToMongo(Assignment, this.data.assignments[idx]);
     return this.data.assignments[idx];

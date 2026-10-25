@@ -1924,8 +1924,23 @@ app.get('/api/assignments', optionalAuth, (req, res) => {
 
     const enriched = assignments.map(a => {
       const asgSubs = submissions.filter(s => s.assignmentId === a.id);
+      const rawExamples = Array.isArray(a.examples)
+        ? a.examples
+        : (Array.isArray(a.testcases) ? a.testcases : []);
+      const sanitizedExamples = rawExamples.map(ex => ({
+        input: typeof ex.input === 'string' ? ex.input : String(ex.input ?? ''),
+        expectedOutput: typeof ex.expectedOutput === 'string' ? ex.expectedOutput : String(ex.expectedOutput ?? ''),
+        explanation: typeof ex.explanation === 'string' ? ex.explanation : String(ex.explanation ?? '')
+      }));
+
       return {
         ...a,
+        problemStatement: a.problemStatement || a.description || '',
+        inputFormat: a.inputFormat || '',
+        outputFormat: a.outputFormat || '',
+        constraints: a.constraints || '',
+        examples: sanitizedExamples,
+        testcases: sanitizedExamples,
         submissionCount: asgSubs.length,
         averageQuizScore: asgSubs.length > 0
           ? Math.round(asgSubs.reduce((acc, curr) => acc + (curr.quizScore || 0), 0) / asgSubs.length)
@@ -1942,11 +1957,53 @@ app.get('/api/assignments', optionalAuth, (req, res) => {
 // Get single assignment
 app.get('/api/assignments/:id', optionalAuth, (req, res) => {
   try {
-    const assignment = db.getAssignmentById(req.params.id);
+    const { id } = req.params;
+    if (!id || typeof id !== 'string' || !id.trim()) {
+      return res.status(400).json({ error: 'Valid assignment ID is required' });
+    }
+    const cleanId = id.trim();
+    const assignment = db.getAssignmentById(cleanId);
     if (!assignment) {
       return res.status(404).json({ error: 'Assignment not found' });
     }
-    res.json(assignment);
+
+    // Role-based department/division check for student
+    if (req.user && req.user.role === 'student') {
+      const studentDiv = (req.user.division || 'A').toUpperCase();
+      const studentDept = (req.user.department || '').toLowerCase();
+      if (assignment.department && studentDept && assignment.department.toLowerCase() !== studentDept) {
+        return res.status(403).json({ error: 'Access denied: Assignment belongs to another department' });
+      }
+      if (Array.isArray(assignment.divisions) && assignment.divisions.length > 0) {
+        const upperDivs = assignment.divisions.map(d => String(d).toUpperCase());
+        if (!upperDivs.includes('ALL') && !upperDivs.includes(studentDiv)) {
+          return res.status(403).json({ error: 'Access denied: Assignment not available for your division' });
+        }
+      }
+    }
+
+    // Explicitly guarantee examples belong strictly to this assignment and never use generic fallbacks
+    const rawExamples = Array.isArray(assignment.examples)
+      ? assignment.examples
+      : (Array.isArray(assignment.testcases) ? assignment.testcases : []);
+
+    const sanitizedExamples = rawExamples.map(ex => ({
+      input: typeof ex.input === 'string' ? ex.input : String(ex.input ?? ''),
+      expectedOutput: typeof ex.expectedOutput === 'string' ? ex.expectedOutput : String(ex.expectedOutput ?? ''),
+      explanation: typeof ex.explanation === 'string' ? ex.explanation : String(ex.explanation ?? '')
+    }));
+
+    const responsePayload = {
+      ...assignment,
+      problemStatement: assignment.problemStatement || assignment.description || '',
+      inputFormat: assignment.inputFormat || '',
+      outputFormat: assignment.outputFormat || '',
+      constraints: assignment.constraints || '',
+      examples: sanitizedExamples,
+      testcases: sanitizedExamples
+    };
+
+    res.json(responsePayload);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch assignment: ' + err.message });
   }
@@ -1962,18 +2019,30 @@ app.post('/api/assignments', authenticate, authorize('teacher', 'admin'), (req, 
       deadline, 
       languages, 
       minQuizScore, 
-      description, 
+      description,
+      problemStatement,
+      inputFormat,
+      outputFormat,
+      constraints,
       starterCode, 
-      testcases, 
+      testcases,
+      examples,
       expectedOutput,
       department,
       division,
       divisions
     } = req.body;
 
-    if (!title || !description) {
-      return res.status(400).json({ error: 'Title and description are required' });
+    if (!title || (!description && !problemStatement)) {
+      return res.status(400).json({ error: 'Title and description/problem statement are required' });
     }
+
+    const rawExamples = Array.isArray(examples) ? examples : (Array.isArray(testcases) ? testcases : []);
+    const sanitizedExamples = rawExamples.map(ex => ({
+      input: typeof ex.input === 'string' ? ex.input : String(ex.input ?? ''),
+      expectedOutput: typeof ex.expectedOutput === 'string' ? ex.expectedOutput : String(ex.expectedOutput ?? ''),
+      explanation: typeof ex.explanation === 'string' ? ex.explanation : String(ex.explanation ?? '')
+    }));
 
     const targetDivision = division || 'all';
     const targetDivisions = Array.isArray(divisions) && divisions.length > 0
@@ -1988,8 +2057,13 @@ app.post('/api/assignments', authenticate, authorize('teacher', 'admin'), (req, 
       deadline: deadline || new Date(Date.now() + 14 * 86400000).toISOString(),
       languages: Array.isArray(languages) && languages.length > 0 ? languages : ['python'],
       minQuizScore: Number(minQuizScore) || 70,
-      description,
-      testcases: Array.isArray(testcases) ? testcases : [],
+      description: description || problemStatement || '',
+      problemStatement: problemStatement || description || '',
+      inputFormat: inputFormat || '',
+      outputFormat: outputFormat || '',
+      constraints: constraints || '',
+      examples: sanitizedExamples,
+      testcases: sanitizedExamples,
       expectedOutput: expectedOutput || '',
       starterCode: starterCode || { python: '# Write your solution here\n' },
       department: department || req.user.department || 'Computer Engineering',
@@ -2021,7 +2095,12 @@ app.post('/api/assignments/generate-testcases', authenticate, async (req, res) =
 // Update assignment (Teacher/Admin only)
 app.put('/api/assignments/:id', authenticate, authorize('teacher', 'admin'), (req, res) => {
   try {
-    const asg = db.getAssignmentById(req.params.id);
+    const { id } = req.params;
+    if (!id || typeof id !== 'string' || !id.trim()) {
+      return res.status(400).json({ error: 'Valid assignment ID is required' });
+    }
+    const cleanId = id.trim();
+    const asg = db.getAssignmentById(cleanId);
     if (!asg) {
       return res.status(404).json({ error: 'Assignment not found' });
     }
@@ -2029,7 +2108,22 @@ app.put('/api/assignments/:id', authenticate, authorize('teacher', 'admin'), (re
       return res.status(403).json({ error: 'Access denied: You can only edit your own assignments' });
     }
 
-    const updated = db.updateAssignment(req.params.id, req.body);
+    const { id: _ignoreId, ...fieldsToUpdate } = req.body || {};
+
+    if (fieldsToUpdate.examples !== undefined || fieldsToUpdate.testcases !== undefined) {
+      const raw = Array.isArray(fieldsToUpdate.examples)
+        ? fieldsToUpdate.examples
+        : (Array.isArray(fieldsToUpdate.testcases) ? fieldsToUpdate.testcases : []);
+      const sanitized = raw.map(ex => ({
+        input: typeof ex.input === 'string' ? ex.input : String(ex.input ?? ''),
+        expectedOutput: typeof ex.expectedOutput === 'string' ? ex.expectedOutput : String(ex.expectedOutput ?? ''),
+        explanation: typeof ex.explanation === 'string' ? ex.explanation : String(ex.explanation ?? '')
+      }));
+      fieldsToUpdate.examples = sanitized;
+      fieldsToUpdate.testcases = sanitized;
+    }
+
+    const updated = db.updateAssignment(cleanId, fieldsToUpdate);
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: 'Failed to update assignment: ' + err.message });

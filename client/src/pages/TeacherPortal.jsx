@@ -37,7 +37,8 @@ import {
   Settings,
   CheckSquare,
   Square,
-  ChevronDown
+  ChevronDown,
+  Edit
 } from 'lucide-react';
 
 // Helper for auth headers
@@ -70,18 +71,20 @@ export default function TeacherPortal({
   // TAB 2: COURSE ASSIGNMENTS STATE
   // ==========================================
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingAsgId, setEditingAsgId] = useState(null);
   const [title, setTitle] = useState('');
   const [subject, setSubject] = useState('Data Structures & Algorithms');
   const [code, setCode] = useState('CS302');
   const [deadline, setDeadline] = useState('2026-11-15');
   const [minQuiz, setMinQuiz] = useState(70);
   const [desc, setDesc] = useState('');
+  const [inputFormat, setInputFormat] = useState('');
+  const [outputFormat, setOutputFormat] = useState('');
+  const [constraints, setConstraints] = useState('');
   const [targetDepartment, setTargetDepartment] = useState(currentUser?.department || 'Computer Engineering');
   const [targetDivision, setTargetDivision] = useState('all');
-  const [testcases, setTestcases] = useState([
-    { input: "4\n6\n", expectedOutput: "even", explanation: "4 is an even number" },
-    { input: "5\n7\n", expectedOutput: "odd", explanation: "5 is an odd number" }
-  ]);
+  const [testcases, setTestcases] = useState([]);
   const [isGeneratingAiTestcases, setIsGeneratingAiTestcases] = useState(false);
   const [isSubmittingAsg, setIsSubmittingAsg] = useState(false);
 
@@ -539,11 +542,16 @@ export default function TeacherPortal({
           deadline: new Date(deadline).toISOString(),
           minQuizScore: Number(minQuiz),
           description: desc,
+          problemStatement: desc,
+          inputFormat,
+          outputFormat,
+          constraints,
           department: targetDepartment || currentUser?.department || 'Computer Engineering',
           division: targetDivision,
           divisions: targetDivision === 'all' ? ['A', 'B', 'C'] : [targetDivision],
           languages: ['python', 'cpp', 'c', 'java', 'javascript'],
           testcases: testcases || [],
+          examples: testcases || [],
           starterCode: {
             python: '# Python Solution\nprint("Hello World")\n',
             cpp: '// C++ Solution\n#include <iostream>\nusing namespace std;\n\nint main() {\n    return 0;\n}\n',
@@ -559,6 +567,10 @@ export default function TeacherPortal({
         if (onRefreshData) onRefreshData();
         setTitle('');
         setDesc('');
+        setInputFormat('');
+        setOutputFormat('');
+        setConstraints('');
+        setTestcases([]);
         setTargetDivision('all');
       } else {
         const err = await res.json();
@@ -566,6 +578,74 @@ export default function TeacherPortal({
       }
     } catch (err) {
       alert('Error creating assignment: ' + err.message);
+    } finally {
+      setIsSubmittingAsg(false);
+    }
+  };
+
+  // Open Edit Modal for an assignment
+  const handleOpenEditModal = (asg) => {
+    setEditingAsgId(asg.id);
+    setTitle(asg.title || '');
+    setSubject(asg.subject || 'Data Structures & Algorithms');
+    setCode(asg.code || '');
+    setDeadline(asg.deadline ? asg.deadline.split('T')[0] : '2026-11-15');
+    setMinQuiz(asg.minQuizScore || 70);
+    setDesc(asg.problemStatement || asg.description || '');
+    setInputFormat(asg.inputFormat || '');
+    setOutputFormat(asg.outputFormat || '');
+    setConstraints(asg.constraints || '');
+    setTargetDepartment(asg.department || currentUser?.department || 'Computer Engineering');
+    setTargetDivision(asg.division || 'all');
+    const existingCases = (Array.isArray(asg.examples) && asg.examples.length > 0)
+      ? asg.examples
+      : (Array.isArray(asg.testcases) ? asg.testcases : []);
+    setTestcases(existingCases.map(tc => ({
+      input: tc.input || '',
+      expectedOutput: tc.expectedOutput || '',
+      explanation: tc.explanation || ''
+    })));
+    setIsEditModalOpen(true);
+  };
+
+  // Handle assignment update
+  const handleUpdateAssignment = async (e) => {
+    e.preventDefault();
+    if (!editingAsgId) return;
+    setIsSubmittingAsg(true);
+    try {
+      const res = await fetch(`/api/assignments/${editingAsgId}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          title,
+          subject,
+          code,
+          deadline: new Date(deadline).toISOString(),
+          minQuizScore: Number(minQuiz),
+          description: desc,
+          problemStatement: desc,
+          inputFormat,
+          outputFormat,
+          constraints,
+          department: targetDepartment || currentUser?.department || 'Computer Engineering',
+          division: targetDivision,
+          divisions: targetDivision === 'all' ? ['A', 'B', 'C'] : [targetDivision],
+          testcases: testcases || [],
+          examples: testcases || []
+        })
+      });
+
+      if (res.ok) {
+        setIsEditModalOpen(false);
+        setEditingAsgId(null);
+        if (onRefreshData) onRefreshData();
+      } else {
+        const err = await res.json();
+        alert('Error: ' + (err.error || 'Failed to update assignment'));
+      }
+    } catch (err) {
+      alert('Error updating assignment: ' + err.message);
     } finally {
       setIsSubmittingAsg(false);
     }
@@ -1187,6 +1267,15 @@ export default function TeacherPortal({
                         title="Review Viva Submissions"
                       >
                         <GitCompare className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={() => handleOpenEditModal(asg)}
+                        className="py-2 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs rounded-xl transition flex items-center gap-1"
+                        title="Edit Assignment Specifications & Test Cases"
+                      >
+                        <Edit className="w-3.5 h-3.5" />
+                        <span>Edit</span>
                       </button>
                     </div>
                   </div>
@@ -2436,6 +2525,40 @@ export default function TeacherPortal({
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1 text-xs">Input Format (Optional)</label>
+                  <input
+                    type="text"
+                    value={inputFormat}
+                    onChange={(e) => setInputFormat(e.target.value)}
+                    placeholder="e.g. Space-separated integers on line 1"
+                    className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1 text-xs">Output Format (Optional)</label>
+                  <input
+                    type="text"
+                    value={outputFormat}
+                    onChange={(e) => setOutputFormat(e.target.value)}
+                    placeholder="e.g. A single integer or boolean string"
+                    className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1 text-xs">Constraints (Optional)</label>
+                <input
+                  type="text"
+                  value={constraints}
+                  onChange={(e) => setConstraints(e.target.value)}
+                  placeholder="e.g. 1 <= N <= 10^5, -10^9 <= val <= 10^9"
+                  className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono text-slate-900 dark:text-white"
+                />
+              </div>
+
               {/* LeetCode Testcases Configuration & AI Generator */}
               <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2.5">
                 <div className="flex items-center justify-between">
@@ -2517,6 +2640,239 @@ export default function TeacherPortal({
                 >
                   {isSubmittingAsg && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
                   <span>Publish Assignment</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Assignment Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="font-extrabold text-lg text-slate-900 dark:text-white flex items-center gap-2">
+                <Edit className="w-5 h-5 text-indigo-600" />
+                <span>Edit Assignment Specifications</span>
+              </h3>
+              <button 
+                onClick={() => setIsEditModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateAssignment} className="space-y-3.5 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Assignment Title</label>
+                <input
+                  type="text"
+                  required
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Course Code</label>
+                  <input
+                    type="text"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Deadline Date</label>
+                  <input
+                    type="date"
+                    value={deadline}
+                    onChange={(e) => setDeadline(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Subject</label>
+                  <input
+                    type="text"
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Min Passing Viva Score (%)</label>
+                  <input
+                    type="number"
+                    min="50"
+                    max="100"
+                    value={minQuiz}
+                    onChange={(e) => setMinQuiz(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Target Department</label>
+                  <input
+                    type="text"
+                    value={targetDepartment}
+                    onChange={(e) => setTargetDepartment(e.target.value)}
+                    placeholder="e.g. Computer Engineering"
+                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Target Division</label>
+                  <select
+                    value={targetDivision}
+                    onChange={(e) => setTargetDivision(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white"
+                  >
+                    <option value="all">All Divisions (A, B, C)</option>
+                    <option value="A">Division A Only</option>
+                    <option value="B">Division B Only</option>
+                    <option value="C">Division C Only</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Problem Description</label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="Explain the problem statement..."
+                  value={desc}
+                  onChange={(e) => setDesc(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1 text-xs">Input Format (Optional)</label>
+                  <input
+                    type="text"
+                    value={inputFormat}
+                    onChange={(e) => setInputFormat(e.target.value)}
+                    placeholder="e.g. Space-separated integers on line 1"
+                    className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1 text-xs">Output Format (Optional)</label>
+                  <input
+                    type="text"
+                    value={outputFormat}
+                    onChange={(e) => setOutputFormat(e.target.value)}
+                    placeholder="e.g. A single integer or boolean string"
+                    className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1 text-xs">Constraints (Optional)</label>
+                <input
+                  type="text"
+                  value={constraints}
+                  onChange={(e) => setConstraints(e.target.value)}
+                  placeholder="e.g. 1 <= N <= 10^5, -10^9 <= val <= 10^9"
+                  className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono text-slate-900 dark:text-white"
+                />
+              </div>
+
+              {/* LeetCode Testcases Configuration & AI Generator */}
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-800 dark:text-slate-200 block text-xs flex items-center gap-1.5">
+                    <span>🧪 Assignment Test Cases ({testcases.length})</span>
+                    <span className="text-[10px] text-slate-500 font-normal">(LeetCode Style Stdin &amp; Output)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAiGenerateTestcases}
+                    disabled={isGeneratingAiTestcases}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] flex items-center gap-1 shadow-xs transition"
+                  >
+                    {isGeneratingAiTestcases ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3 text-amber-300" />}
+                    <span>{isGeneratingAiTestcases ? 'Generating...' : '✨ AI Generate Testcases'}</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                  {testcases.map((tc, idx) => (
+                    <div key={idx} className="p-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-bold text-indigo-600 dark:text-indigo-400">Case {idx + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => setTestcases(prev => prev.filter((_, i) => i !== idx))}
+                          className="text-rose-500 hover:text-rose-700 font-bold text-[10px]"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="Input (stdin, e.g. 10 20)"
+                          value={tc.input || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setTestcases(prev => prev.map((t, i) => i === idx ? { ...t, input: val } : t));
+                          }}
+                          className="p-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-mono text-slate-900 dark:text-white"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Expected Output (e.g. 20)"
+                          value={tc.expectedOutput || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setTestcases(prev => prev.map((t, i) => i === idx ? { ...t, expectedOutput: val } : t));
+                          }}
+                          className="p-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-mono text-slate-900 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setTestcases(prev => [...prev, { input: '', expectedOutput: '', explanation: '' }])}
+                  className="w-full py-1 text-center text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  + Add Custom Testcase
+                </button>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingAsg}
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition shadow-xs flex items-center gap-1.5"
+                >
+                  {isSubmittingAsg && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  <span>Save Changes</span>
                 </button>
               </div>
             </form>
