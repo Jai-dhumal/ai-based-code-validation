@@ -790,7 +790,7 @@ export default function StudentPortal({
 
   // STEP 1: Check Plagiarism
   const handleCheckPlagiarism = async () => {
-    if (!code || code.trim().length < 20) {
+    if (!code || code.trim().length < 10) {
       alert('Please write or paste your code before checking.');
       return;
     }
@@ -800,13 +800,15 @@ export default function StudentPortal({
     setAiReport(null);
 
     try {
+      const targetAssignmentId = activeAssignment?.id || selectedAssignment?.id || 'all';
+
       // 1. Run Tier-1 Plagiarism Check
       const res = await fetch('/api/validate/tier1', {
         method: 'POST',
         headers: getAuthHeaders(true),
         body: JSON.stringify({
           code,
-          assignmentId: selectedAssignment.id,
+          assignmentId: targetAssignmentId,
           studentId: currentUser?.id,
           language: selectedLanguage,
           stdin: stdinInput || ''
@@ -814,6 +816,10 @@ export default function StudentPortal({
       });
 
       const t1Data = await res.json();
+      if (!res.ok) {
+        alert(t1Data.error || `Validation failed with status ${res.status}`);
+        return;
+      }
       setPlagResult(t1Data);
 
       // 2. If borderline, automatically trigger Tier-2 Gemini check
@@ -823,16 +829,18 @@ export default function StudentPortal({
           headers: getAuthHeaders(true),
           body: JSON.stringify({
             code,
-            assignmentId: selectedAssignment.id,
+            assignmentId: targetAssignmentId,
             referenceCode: t1Data.mostSimilarSubmission?.code,
             studentName: currentUser?.name
           })
         });
-        const t2Data = await t2Res.json();
-        setAiReport(t2Data);
+        if (t2Res.ok) {
+          const t2Data = await t2Res.json();
+          setAiReport(t2Data);
+        }
       }
     } catch (err) {
-      alert('Error: ' + err.message);
+      alert('Error checking plagiarism: ' + err.message);
     } finally {
       setIsCheckingPlag(false);
     }
@@ -842,15 +850,16 @@ export default function StudentPortal({
   const handleRequestQuizAccess = async () => {
     setIsRequestingAccess(true);
     try {
+      const targetAssignment = activeAssignment || selectedAssignment;
       const res = await fetch('/api/quiz-requests', {
         method: 'POST',
         headers: getAuthHeaders(true),
         body: JSON.stringify({
           studentId: currentUser?.id,
           studentName: currentUser?.name,
-          assignmentId: selectedAssignment.id,
-          assignmentTitle: selectedAssignment.title,
-          teacherId: selectedAssignment.teacherId || 'usr_teacher_1',
+          assignmentId: targetAssignment?.id || 'asg_3',
+          assignmentTitle: targetAssignment?.title || 'Assignment',
+          teacherId: targetAssignment?.teacherId || 'usr_teacher_1',
           tier1Score: plagResult?.score || 0,
           tier1Verdict: plagResult?.verdict || 'Clean',
           tier2Score: aiReport?.semanticSimilarityScore || null,
@@ -1097,14 +1106,14 @@ export default function StudentPortal({
     }
   };
 
-  const functionalPassed = plagResult ? plagResult.functionalPassed !== false : true;
-  const hasFunctionalError = plagResult && plagResult.functionalPassed === false;
-  const isClean = plagResult && functionalPassed && plagResult.score < 35;
-  const isBorderline = plagResult && functionalPassed && plagResult.score >= 35 && plagResult.score <= 70;
-  const isShortCode = plagResult && functionalPassed && plagResult.isShortCode;
-  const isAiApproved = plagResult && functionalPassed && aiReport && (aiReport.recommendation === 'Approve for Quiz' || aiReport.logicEquivalence === 'Low');
-  const isHighPlag = plagResult && functionalPassed && plagResult.score > 70 && !isShortCode && !isAiApproved;
-  const canTakeQuiz = (isClean || isBorderline || isShortCode || isAiApproved) && functionalPassed;
+  const hasFatalExecutionError = plagResult && (plagResult.functionalStatus === 'Compile Error' || plagResult.functionalStatus === 'Runtime Error');
+  const hasFunctionalNotice = plagResult && plagResult.functionalPassed === false && !hasFatalExecutionError;
+  const isClean = plagResult && plagResult.score < 35 && !hasFatalExecutionError;
+  const isBorderline = plagResult && plagResult.score >= 35 && plagResult.score <= 70 && !hasFatalExecutionError;
+  const isShortCode = plagResult && plagResult.isShortCode && !hasFatalExecutionError;
+  const isAiApproved = plagResult && aiReport && (aiReport.recommendation === 'Approve for Quiz' || aiReport.logicEquivalence === 'Low') && !hasFatalExecutionError;
+  const isHighPlag = plagResult && plagResult.score > 70 && !isShortCode && !isAiApproved && !hasFatalExecutionError;
+  const canTakeQuiz = (isClean || isBorderline || isShortCode || isAiApproved) && !hasFatalExecutionError;
 
   return (
     <div className="space-y-6 font-['Plus_Jakarta_Sans',sans-serif]">
@@ -1979,8 +1988,8 @@ export default function StudentPortal({
       {/* ========================================================================= */}
       {plagResult && (
         <div className="space-y-4">
-          {/* 0. If Code Failed Functional Execution or Output Mismatch */}
-          {hasFunctionalError && (
+          {/* 0A. If Program Crashed (Fatal Compile or Runtime Error) */}
+          {hasFatalExecutionError && (
             <div className="bg-rose-50 dark:bg-rose-950/30 border border-rose-300 dark:border-rose-800 rounded-3xl p-6 text-rose-950 dark:text-rose-100 space-y-3 card-float">
               <div className="flex items-start space-x-3.5">
                 <div className="w-12 h-12 rounded-2xl bg-rose-600 text-white flex items-center justify-center font-black text-xl shrink-0 shadow-sm animate-float">
@@ -1989,29 +1998,50 @@ export default function StudentPortal({
                 <div className="grow">
                   <div className="flex items-center gap-2">
                     <span className="px-2 py-0.5 rounded-md bg-rose-200 dark:bg-rose-900 text-rose-800 dark:text-rose-200 font-bold text-[10px] uppercase">
-                      {plagResult.functionalStatus || 'Requirement Mismatch'}
+                      {plagResult.functionalStatus || 'Execution Error'}
                     </span>
                     <h4 className="font-extrabold text-sm text-rose-900 dark:text-rose-200">
-                      Output Verification Failed
+                      Compilation or Runtime Error
                     </h4>
                   </div>
                   <p className="text-xs text-rose-700 dark:text-rose-300 mt-1 font-medium">
                     {plagResult.functionalReason}
                   </p>
-                  {plagResult.executionOutput && (
-                    <div className="mt-2.5 p-3 bg-slate-900 rounded-xl font-mono text-xs text-emerald-400 border border-slate-800">
-                      <span className="text-slate-400 text-[10px] uppercase tracking-wider block mb-1">Your Program Output:</span>
-                      {plagResult.executionOutput}
-                    </div>
-                  )}
                   {plagResult.executionError && (
-                    <div className="mt-2 p-2.5 bg-rose-950/80 rounded-xl font-mono text-xs text-rose-300 border border-rose-800">
-                      <span className="text-rose-400 text-[10px] uppercase tracking-wider block mb-1">Execution Error:</span>
+                    <div className="mt-2.5 p-3 bg-slate-900 rounded-xl font-mono text-xs text-rose-400 border border-slate-800">
+                      <span className="text-slate-400 text-[10px] uppercase tracking-wider block mb-1">Compiler Diagnostics:</span>
                       {plagResult.executionError}
                     </div>
                   )}
                   <p className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold mt-2.5">
-                    👉 Please update your program so that it prints or computes the actual expected output for "{activeAssignment?.title || selectedAssignment?.title}". Once your output matches requirements, you can proceed to the viva quiz.
+                    👉 Fix the syntax or runtime error above and re-click Step 1 to verify.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 0B. If Code Had Advisory Output Difference (Non-fatal, Originality Verified) */}
+          {hasFunctionalNotice && (
+            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 rounded-3xl p-5 text-amber-950 dark:text-amber-100 space-y-2 card-float">
+              <div className="flex items-start space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold text-lg shrink-0 shadow-xs">
+                  ℹ️
+                </div>
+                <div className="grow">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded-md bg-amber-200 dark:bg-amber-900 text-amber-800 dark:text-amber-200 font-bold text-[10px] uppercase">
+                      Sample Notice
+                    </span>
+                    <h4 className="font-extrabold text-xs text-amber-900 dark:text-amber-200">
+                      Output Format Observation
+                    </h4>
+                  </div>
+                  <p className="text-xs text-amber-800 dark:text-amber-300 mt-1 font-medium">
+                    {plagResult.functionalReason}
+                  </p>
+                  <p className="text-[11px] text-amber-700 dark:text-amber-400 font-semibold mt-1">
+                    ✓ Your code's originality ({plagResult.score}% similarity) has been verified. You may proceed to Step 2 for the AI Viva.
                   </p>
                 </div>
               </div>

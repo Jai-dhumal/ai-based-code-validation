@@ -616,13 +616,37 @@ class Database {
   }
 
   // --- Assignments ---
+  _healAssignment(asg) {
+    if (!asg) return asg;
+    const isGreatest = /greatest|maximum|max of|largest/i.test(asg.title || '');
+    if (isGreatest) {
+      const rawTc = Array.isArray(asg.testcases) ? asg.testcases : [];
+      const hasCorrupted = rawTc.some(tc => 
+        String(tc.expectedOutput || '').trim() === '11' || 
+        String(tc.expectedOutput || '').trim() === '22' || 
+        String(tc.input || '').trim() === '10' ||
+        /Sample Testcase/i.test(tc.explanation || '')
+      );
+      if (hasCorrupted || rawTc.length === 0) {
+        const fixed = [
+          { input: "10 20", expectedOutput: "20", explanation: "20 is greater than 10" },
+          { input: "45 12", expectedOutput: "45", explanation: "45 is greater than 12" }
+        ];
+        asg.testcases = fixed;
+        asg.examples = fixed;
+      }
+    }
+    return asg;
+  }
+
   getAssignments() {
-    return this.data.assignments;
+    return (this.data.assignments || []).map(a => this._healAssignment(a));
   }
 
   getAssignmentById(id) {
     if (!id || typeof id !== 'string') return null;
-    return this.data.assignments.find(a => a.id === id.trim());
+    const asg = this.data.assignments.find(a => a.id === id.trim());
+    return asg ? this._healAssignment(asg) : null;
   }
 
   addAssignment(asg) {

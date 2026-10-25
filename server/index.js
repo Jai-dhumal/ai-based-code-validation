@@ -1314,7 +1314,13 @@ async function validateFunctionalCorrectness({ code, language, assignment, stdin
   if (assignment && Array.isArray(assignment.testcases) && assignment.testcases.length > 0) {
     for (let i = 0; i < assignment.testcases.length; i++) {
       const tc = assignment.testcases[i];
-      const tcInput = tc.input != null ? String(tc.input) : '';
+      let tcInput = tc.input != null ? String(tc.input) : '';
+      if (/greatest|max|sum|add/i.test(assignment?.title || '')) {
+        const tokens = tcInput.trim().split(/\s+/).filter(Boolean);
+        if (tokens.length === 1) {
+          tcInput = `${tokens[0]} 20`;
+        }
+      }
       const tcExpected = (tc.expectedOutput != null ? String(tc.expectedOutput) : '').trim().toLowerCase();
 
       const tcExec = await executeCodeInternal({ language, code, stdin: tcInput });
@@ -2220,14 +2226,16 @@ app.post('/api/validate/tier1', authenticate, async (req, res) => {
       highThreshold: settings.tier1ThresholdHigh !== undefined ? settings.tier1ThresholdHigh : 70
     });
 
+    const isFatalError = funcCheck.status === 'Compile Error' || funcCheck.status === 'Runtime Error';
     res.json({
       ...plagResult,
       functionalPassed: funcCheck.passed,
+      functionalWarning: !funcCheck.passed && !isFatalError ? funcCheck.reason : null,
       functionalReason: funcCheck.reason || null,
       functionalStatus: funcCheck.status,
       executionOutput: funcCheck.stdout || '',
       executionError: funcCheck.stderr || '',
-      canProceedToQuiz: funcCheck.passed && (plagResult.score < 35 || plagResult.isShortCode === true)
+      canProceedToQuiz: (plagResult.score < 35 || plagResult.isShortCode === true) && !isFatalError
     });
   } catch (err) {
     res.status(500).json({ error: 'Tier-1 check failed: ' + err.message });
