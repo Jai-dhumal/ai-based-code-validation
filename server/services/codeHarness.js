@@ -57,6 +57,7 @@ export function prepareRunnableCode({ language = 'python', code = '', stdin = ''
       const returnType = targetMethod ? targetMethod[1].trim() : 'void';
       const methodName = targetMethod ? targetMethod[2].trim() : null;
       const params = targetMethod ? targetMethod[3].trim() : '';
+      const paramList = params.split(',').map(p => p.trim()).filter(Boolean);
 
       const lastBrace = raw.lastIndexOf('}');
       if (lastBrace !== -1 && methodName) {
@@ -64,27 +65,43 @@ export function prepareRunnableCode({ language = 'python', code = '', stdin = ''
         const invoker = isStatic ? `${cName}.${methodName}` : `new ${cName}().${methodName}`;
 
         let driverCall = '';
-        if (params.includes('int') || params.includes('Integer')) {
-          driverCall = `
-          if (sc.hasNextInt()) {
-              int arg = sc.nextInt();
+        if (paramList.length === 0) {
+          driverCall = returnType === 'void' ? `${invoker}();` : `System.out.println(${invoker}());`;
+        } else if (paramList.length === 1) {
+          if (params.toLowerCase().includes('string')) {
+            driverCall = `
+              String arg = sc.hasNext() ? sc.next() : "";
+              ${returnType === 'void' ? `${invoker}(arg);` : `System.out.println(${invoker}(arg));`}
+            `;
+          } else {
+            driverCall = `
+              int arg = sc.hasNextInt() ? sc.nextInt() : 0;
               ${returnType === 'void' 
                 ? `${invoker}(arg);` 
                 : returnType === 'boolean' || returnType === 'Boolean'
-                ? `boolean res = ${invoker}(arg);\n              System.out.println(res ? "even" : "odd");`
-                : `Object res = ${invoker}(arg);\n              System.out.println(res);`
-              }
-          } else {
-              ${returnType === 'void' ? '' : `System.out.println(${invoker}(4));`}
-          }`;
-        } else if (params.includes('String')) {
+                ? `System.out.println(${invoker}(arg));`
+                : `System.out.println(${invoker}(arg));`}
+            `;
+          }
+        } else if (paramList.length === 2) {
           driverCall = `
-          if (sc.hasNext()) {
-              String arg = sc.next();
-              ${returnType === 'void' ? `${invoker}(arg);` : `Object res = ${invoker}(arg);\n              System.out.println(res);`}
-          }`;
+              int a = sc.hasNextInt() ? sc.nextInt() : 0;
+              int b = sc.hasNextInt() ? sc.nextInt() : 0;
+              ${returnType === 'void' 
+                ? `${invoker}(a, b);` 
+                : `System.out.println(${invoker}(a, b));`}
+          `;
+        } else if (paramList.length === 3) {
+          driverCall = `
+              int a = sc.hasNextInt() ? sc.nextInt() : 0;
+              int b = sc.hasNextInt() ? sc.nextInt() : 0;
+              int c = sc.hasNextInt() ? sc.nextInt() : 0;
+              ${returnType === 'void' 
+                ? `${invoker}(a, b, c);` 
+                : `System.out.println(${invoker}(a, b, c));`}
+          `;
         } else {
-          driverCall = `${returnType === 'void' ? `${invoker}();` : `Object res = ${invoker}();\n          System.out.println(res);`}`;
+          driverCall = returnType === 'void' ? `${invoker}();` : `System.out.println(${invoker}());`;
         }
 
         const driver = `
@@ -103,7 +120,7 @@ export function prepareRunnableCode({ language = 'python', code = '', stdin = ''
       }
     }
 
-    // Case 3: Raw statements (e.g. from user screenshot: n = sobj.nextInt(); if (n % 2 == 0) ...)
+    // Case 3: Raw statements
     const wrapped = `import java.util.*;
 import java.io.*;
 import java.lang.*;
@@ -151,32 +168,45 @@ public class Solution {
         if (targetMethod) {
           const retType = targetMethod[1].trim();
           const mName = targetMethod[2].trim();
+          const params = targetMethod[3].trim();
+          const paramList = params.split(',').map(p => p.trim()).filter(Boolean);
           const isVoid = retType === 'void';
           const isBool = retType === 'bool';
-          const params = targetMethod[3].trim();
 
-          let callLogic = '';
-          if (isVoid) {
-            callLogic = params ? `sol.${mName}(n);\n        cout << "Executed " << "${mName}" << "(" << n << ")" << endl;` : `sol.${mName}();`;
-          } else if (isBool) {
-            callLogic = params 
-              ? `bool res = sol.${mName}(n);\n        cout << (res ? "true" : "false") << endl;`
-              : `bool res = sol.${mName}();\n        cout << (res ? "true" : "false") << endl;`;
+          let inputRead = '';
+          let argNames = [];
+          if (paramList.length === 0) {
+            // no args
+          } else if (paramList.length === 1 && (paramList[0].includes('vector<int>') || paramList[0].includes('vector<long'))) {
+            inputRead = 'vector<int> nums; int val; while (cin >> val) nums.push_back(val);';
+            argNames = ['nums'];
           } else {
-            callLogic = params 
-              ? `auto res = sol.${mName}(n);\n        cout << res << endl;`
-              : `auto res = sol.${mName}();\n        cout << res << endl;`;
+            paramList.forEach((p, idx) => {
+              const v = String.fromCharCode(97 + idx); // a, b, c...
+              if (p.includes('string')) {
+                inputRead += `string ${v}; if (!(cin >> ${v})) ${v} = ""; `;
+              } else {
+                inputRead += `long long ${v} = 0; if (!(cin >> ${v})) ${v} = 0; `;
+              }
+              argNames.push(v);
+            });
+          }
+
+          const callExpr = `sol.${mName}(${argNames.join(', ')})`;
+          let printLogic = '';
+          if (isVoid) {
+            printLogic = `${callExpr};`;
+          } else if (isBool) {
+            printLogic = `bool res = ${callExpr}; cout << (res ? "true" : "false") << endl;`;
+          } else {
+            printLogic = `auto res = ${callExpr}; cout << res << endl;`;
           }
 
           const driver = `
 int main() {
     ${cName} sol;
-    int n = 0;
-    if (cin >> n) {
-        ${callLogic}
-    } else {
-        ${callLogic}
-    }
+    ${inputRead}
+    ${printLogic}
     return 0;
 }
 `;
@@ -185,35 +215,48 @@ int main() {
           full = full + `\nint main() {\n    ${cName} sol;\n    return 0;\n}`;
         }
       } else {
-        const funcMatch = full.match(/(?:int|bool|void|string|double|auto)\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)/);
+        const funcMatch = full.match(/(?:int|bool|void|string|double|auto|long\s+long)\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)/);
         if (funcMatch && funcMatch[1] !== 'main') {
           const fName = funcMatch[1];
           const retType = funcMatch[0].split(/\s+/)[0];
+          const params = (funcMatch[2] || '').trim();
+          const paramList = params.split(',').map(p => p.trim()).filter(Boolean);
           const isVoid = retType === 'void';
           const isBool = retType === 'bool';
-          const params = (funcMatch[2] || '').trim();
 
-          let callLogic = '';
-          if (isVoid) {
-            callLogic = params ? `${fName}(n);\n        cout << "Executed " << "${fName}" << "(" << n << ")" << endl;` : `${fName}();`;
-          } else if (isBool) {
-            callLogic = params
-              ? `bool res = ${fName}(n);\n        cout << (res ? "true" : "false") << endl;`
-              : `bool res = ${fName}();\n        cout << (res ? "true" : "false") << endl;`;
+          let inputRead = '';
+          let argNames = [];
+          if (paramList.length === 0) {
+            // no args
+          } else if (paramList.length === 1 && (paramList[0].includes('vector<int>') || paramList[0].includes('vector<long'))) {
+            inputRead = 'vector<int> nums; int val; while (cin >> val) nums.push_back(val);';
+            argNames = ['nums'];
           } else {
-            callLogic = params
-              ? `auto res = ${fName}(n);\n        cout << res << endl;`
-              : `auto res = ${fName}();\n        cout << res << endl;`;
+            paramList.forEach((p, idx) => {
+              const v = String.fromCharCode(97 + idx); // a, b, c...
+              if (p.includes('string')) {
+                inputRead += `string ${v}; if (!(cin >> ${v})) ${v} = ""; `;
+              } else {
+                inputRead += `long long ${v} = 0; if (!(cin >> ${v})) ${v} = 0; `;
+              }
+              argNames.push(v);
+            });
+          }
+
+          const callExpr = `${fName}(${argNames.join(', ')})`;
+          let printLogic = '';
+          if (isVoid) {
+            printLogic = `${callExpr};`;
+          } else if (isBool) {
+            printLogic = `bool res = ${callExpr}; cout << (res ? "true" : "false") << endl;`;
+          } else {
+            printLogic = `auto res = ${callExpr}; cout << res << endl;`;
           }
 
           const driver = `
 int main() {
-    int n = 0;
-    if (cin >> n) {
-        ${callLogic}
-    } else {
-        ${callLogic}
-    }
+    ${inputRead}
+    ${printLogic}
     return 0;
 }
 `;
@@ -277,8 +320,8 @@ if __name__ == '__main__':
     args = [int(x) if x.lstrip('-').isdigit() else x for x in data]
     try:
         ${hasClass 
-          ? `sol = Solution()\n        if hasattr(sol, '${fName}'):\n            res = sol.${fName}(*args) if args else sol.${fName}()\n            if isinstance(res, bool):\n                print("even" if res else "odd")\n            elif res is not None:\n                print(res)`
-          : `if '${fName}' in globals():\n            res = globals()['${fName}'](*args) if args else globals()['${fName}']()\n            if isinstance(res, bool):\n                print("even" if res else "odd")\n            elif res is not None:\n                print(res)`
+          ? `sol = Solution()\n        if hasattr(sol, '${fName}'):\n            res = sol.${fName}(*args) if args else sol.${fName}()\n            if isinstance(res, bool):\n                print("true" if res else "false")\n            elif res is not None:\n                print(res)`
+          : `if '${fName}' in globals():\n            res = globals()['${fName}'](*args) if args else globals()['${fName}']()\n            if isinstance(res, bool):\n                print("true" if res else "false")\n            elif res is not None:\n                print(res)`
         }
     except Exception as e:
         pass

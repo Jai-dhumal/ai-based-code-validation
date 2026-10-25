@@ -1076,18 +1076,23 @@ function offlineQuizGenerator(code = '', assignmentTitle = '', language = 'pytho
 export async function generateAssignmentTestcases({ title = '', description = '', language = 'cpp', apiKey }) {
   if (apiKey) {
     try {
-      const prompt = `You are a computer science professor creating test cases for a programming problem.
+      const prompt = `You are a computer science professor creating LeetCode-style test cases for a programming problem.
 Title: "${title}"
 Description: "${description}"
 Language: ${language}
 
-Generate 2 or 3 standard test cases with input and expected output substring.
+Generate 2 or 3 standard, accurate test cases with input and expected output.
+Rules:
+1. For inputs, provide clean values without raw escaped '\\n' strings (e.g. for two numbers use "10 20").
+2. The expected output must strictly be the mathematically or algorithmically correct answer.
+3. Provide a clear, educational explanation for each test case.
+
 Respond ONLY with a valid JSON array in this exact format:
 [
   {
-    "input": "4\\n6\\n",
-    "expectedOutput": "The first number is even",
-    "explanation": "4 is an even number"
+    "input": "10 20",
+    "expectedOutput": "20",
+    "explanation": "20 is greater than 10"
   }
 ]`;
 
@@ -1108,7 +1113,13 @@ Respond ONLY with a valid JSON array in this exact format:
         const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (rawText) {
           const parsed = JSON.parse(rawText);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed.map(tc => ({
+              input: String(tc.input ?? '').replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').trim(),
+              expectedOutput: String(tc.expectedOutput ?? '').trim(),
+              explanation: String(tc.explanation ?? '').trim()
+            }));
+          }
         }
       }
     } catch (e) {
@@ -1116,27 +1127,100 @@ Respond ONLY with a valid JSON array in this exact format:
     }
   }
 
-  // Heuristic Fallback
+  // Intelligent LeetCode-Style Heuristic Problem Analyzer Fallback
   const titleLower = (title + ' ' + description).toLowerCase();
-  if (titleLower.includes('even') || titleLower.includes('odd')) {
+
+  // 1. Greatest / Maximum of Numbers
+  if (titleLower.includes('great') || titleLower.includes('max') || titleLower.includes('larger')) {
+    if (titleLower.includes('three') || titleLower.includes('3')) {
+      return [
+        { input: "10 20 30", expectedOutput: "30", explanation: "30 is the greatest among 10, 20, and 30" },
+        { input: "55 12 40", expectedOutput: "55", explanation: "55 is the greatest among 55, 12, and 40" }
+      ];
+    }
     return [
-      { input: "4\n6\n", expectedOutput: "even", explanation: "4 is even" },
-      { input: "5\n7\n", expectedOutput: "odd", explanation: "5 is odd" }
-    ];
-  } else if (titleLower.includes('jay ganesh')) {
-    return [
-      { input: "", expectedOutput: "Jay Ganesh", explanation: "Prints devotional greeting" }
-    ];
-  } else if (titleLower.includes('sum') || titleLower.includes('add')) {
-    return [
-      { input: "10\n20\n", expectedOutput: "30", explanation: "10 + 20 = 30" },
-      { input: "5\n15\n", expectedOutput: "20", explanation: "5 + 15 = 20" }
+      { input: "10 20", expectedOutput: "20", explanation: "Between 10 and 20, 20 is the greatest" },
+      { input: "45 12", expectedOutput: "45", explanation: "Between 45 and 12, 45 is the greatest" }
     ];
   }
 
+  // 2. Smallest / Minimum of Numbers
+  if (titleLower.includes('small') || titleLower.includes('min') || titleLower.includes('least')) {
+    return [
+      { input: "10 20", expectedOutput: "10", explanation: "Between 10 and 20, 10 is the smallest" },
+      { input: "45 12", expectedOutput: "12", explanation: "Between 45 and 12, 12 is the smallest" }
+    ];
+  }
+
+  // 3. Even or Odd
+  if (titleLower.includes('even') || titleLower.includes('odd')) {
+    return [
+      { input: "4", expectedOutput: "even", explanation: "4 is divisible by 2" },
+      { input: "7", expectedOutput: "odd", explanation: "7 is not divisible by 2" }
+    ];
+  }
+
+  // 4. Sum / Addition
+  if (titleLower.includes('sum') || titleLower.includes('add')) {
+    return [
+      { input: "10 20", expectedOutput: "30", explanation: "10 + 20 = 30" },
+      { input: "5 15", expectedOutput: "20", explanation: "5 + 15 = 20" }
+    ];
+  }
+
+  // 5. Factorial
+  if (titleLower.includes('factor')) {
+    return [
+      { input: "5", expectedOutput: "120", explanation: "5! = 5 * 4 * 3 * 2 * 1 = 120" },
+      { input: "3", expectedOutput: "6", explanation: "3! = 6" }
+    ];
+  }
+
+  // 6. Prime Number
+  if (titleLower.includes('prime')) {
+    return [
+      { input: "7", expectedOutput: "prime", explanation: "7 has only 1 and 7 as divisors" },
+      { input: "8", expectedOutput: "not prime", explanation: "8 is divisible by 2 and 4" }
+    ];
+  }
+
+  // 7. Palindrome
+  if (titleLower.includes('palind')) {
+    return [
+      { input: "radar", expectedOutput: "palindrome", explanation: "'radar' reads the same forwards and backwards" },
+      { input: "hello", expectedOutput: "not palindrome", explanation: "'hello' is not a palindrome" }
+    ];
+  }
+
+  // 8. Reverse String / Reverse Number
+  if (titleLower.includes('revers')) {
+    return [
+      { input: "hello", expectedOutput: "olleh", explanation: "Reversed string is 'olleh'" },
+      { input: "12345", expectedOutput: "54321", explanation: "Reversed number is 54321" }
+    ];
+  }
+
+  // 9. Binary Search Tree / BST
+  if (titleLower.includes('binary search tree') || titleLower.includes('bst')) {
+    return [
+      { input: "50 30 70 20 40 60 80", expectedOutput: "20 30 40 50 60 70 80", explanation: "In-order traversal yields sorted values" }
+    ];
+  }
+
+  // 10. Greetings / Hello World
+  if (titleLower.includes('jay ganesh')) {
+    return [
+      { input: "", expectedOutput: "Jay Ganesh", explanation: "Prints devotional greeting" }
+    ];
+  } else if (titleLower.includes('hello')) {
+    return [
+      { input: "", expectedOutput: "Hello World", explanation: "Standard greeting output" }
+    ];
+  }
+
+  // Clean, realistic fallback
   return [
-    { input: "10\n", expectedOutput: "10", explanation: "Sample Testcase 1" },
-    { input: "20\n", expectedOutput: "20", explanation: "Sample Testcase 2" }
+    { input: "10 20", expectedOutput: "20", explanation: "Sample input 10 and 20" }
   ];
 }
 

@@ -45,6 +45,17 @@ const getMonacoLanguage = (lang) => {
   return 'python';
 };
 
+const cleanInputDisplay = (val) => {
+  if (val == null || val === '') return '(None)';
+  const s = String(val);
+  return s
+    .replace(/\\r\\n/g, ' ')
+    .replace(/\\n/g, ' ')
+    .replace(/\r\n/g, ' ')
+    .replace(/\n/g, ' ')
+    .trim() || '(None)';
+};
+
 // Sample codes for quick testing
 const DEMO_PRESETS = {
   original: {
@@ -1369,7 +1380,7 @@ export default function StudentPortal({
                     <span className="font-bold text-indigo-600 dark:text-indigo-400">Example {idx + 1}:</span>
                     <div className="text-[11px] text-slate-700 dark:text-slate-300 mt-1">
                       <span className="text-slate-500 font-sans font-medium">Input (stdin): </span>
-                      <code className="text-emerald-600 dark:text-emerald-400 font-bold">{tc.input ? JSON.stringify(tc.input).slice(1, -1) : '(None)'}</code>
+                      <code className="text-emerald-600 dark:text-emerald-400 font-bold">{cleanInputDisplay(tc.input)}</code>
                     </div>
                     <div className="text-[11px] text-slate-700 dark:text-slate-300 mt-0.5">
                       <span className="text-slate-500 font-sans font-medium">Expected Output: </span>
@@ -1816,7 +1827,7 @@ export default function StudentPortal({
                             <div className="text-[11px]">
                               <span className="text-slate-500">Input: </span>
                               <span className="text-emerald-300 font-mono">
-                                {tc.input ? JSON.stringify(tc.input).slice(1, -1) : '(None)'}
+                                {cleanInputDisplay(tc.input)}
                               </span>
                             </div>
 

@@ -517,7 +517,11 @@ export default function TeacherPortal({
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data.testcases) && data.testcases.length > 0) {
-          setTestcases(data.testcases);
+          setTestcases(data.testcases.map(tc => ({
+            input: String(tc.input ?? '').replace(/\\r\\n/g, ' ').replace(/\\n/g, ' ').replace(/\r\n/g, ' ').replace(/\n/g, ' ').trim(),
+            expectedOutput: String(tc.expectedOutput ?? '').trim(),
+            explanation: String(tc.explanation ?? '').trim()
+          })));
         }
       }
     } catch (err) {

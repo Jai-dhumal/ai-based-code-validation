@@ -387,12 +387,69 @@ class Database {
               a.divisions = ['A', 'B', 'C'];
               modified = true;
             }
+
+            // Sanitize and heal any legacy corrupted testcases containing raw "10\n" or "Sample Testcase"
+            const hasCorruptedSample = (arr) => Array.isArray(arr) && arr.some(tc => 
+              (tc.input && (tc.input === '10\n' || tc.input === '10\\n')) || 
+              (tc.explanation && (tc.explanation.includes('Sample Testcase') || tc.explanation.includes('Sample input')))
+            );
+
+            const titleLower = (a.title + ' ' + (a.description || '')).toLowerCase();
+            if (hasCorruptedSample(a.examples) || hasCorruptedSample(a.testcases)) {
+              if (titleLower.includes('great') || titleLower.includes('max') || titleLower.includes('larger')) {
+                a.examples = [
+                  { input: "10 20", expectedOutput: "20", explanation: "Between 10 and 20, 20 is the greatest." },
+                  { input: "45 12", expectedOutput: "45", explanation: "Between 45 and 12, 45 is the greatest." }
+                ];
+                a.testcases = [
+                  { input: "10 20", expectedOutput: "20", explanation: "Between 10 and 20, 20 is the greatest." },
+                  { input: "45 12", expectedOutput: "45", explanation: "Between 45 and 12, 45 is the greatest." }
+                ];
+                modified = true;
+              } else if (titleLower.includes('even') || titleLower.includes('odd')) {
+                a.examples = [
+                  { input: "4", expectedOutput: "even", explanation: "4 is an even number" },
+                  { input: "5", expectedOutput: "odd", explanation: "5 is an odd number" }
+                ];
+                a.testcases = [
+                  { input: "4", expectedOutput: "even", explanation: "4 is an even number" },
+                  { input: "5", expectedOutput: "odd", explanation: "5 is an odd number" }
+                ];
+                modified = true;
+              } else {
+                a.examples = [];
+                a.testcases = [];
+                modified = true;
+              }
+            }
+
+            // Clean any trailing or escaped \n in input strings across all assignments
+            if (Array.isArray(a.examples)) {
+              a.examples.forEach(tc => {
+                if (tc.input) {
+                  const cleaned = String(tc.input).replace(/\\r\\n/g, ' ').replace(/\\n/g, ' ').replace(/\r\n/g, ' ').replace(/\n/g, ' ').trim();
+                  if (cleaned !== tc.input) {
+                    tc.input = cleaned;
+                    modified = true;
+                  }
+                }
+              });
+            }
+            if (Array.isArray(a.testcases)) {
+              a.testcases.forEach(tc => {
+                if (tc.input) {
+                  const cleaned = String(tc.input).replace(/\\r\\n/g, ' ').replace(/\\n/g, ' ').replace(/\r\n/g, ' ').replace(/\n/g, ' ').trim();
+                  if (cleaned !== tc.input) {
+                    tc.input = cleaned;
+                    modified = true;
+                  }
+                }
+              });
+            }
           });
 
           // Ensure asg_3 ('Find Greatest of Two Numbers') exists in assignments
-          const hasGreatest = (this.data.assignments || []).some(a =>
-            a.id === 'asg_3' || a.title?.toLowerCase().includes('greatest')
-          );
+          const hasGreatest = (this.data.assignments || []).some(a => a.id === 'asg_3');
           if (!hasGreatest) {
             const defaultAsg3 = defaultData.assignments.find(a => a.id === 'asg_3');
             if (defaultAsg3) {
