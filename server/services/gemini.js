@@ -1076,23 +1076,29 @@ function offlineQuizGenerator(code = '', assignmentTitle = '', language = 'pytho
 export async function generateAssignmentTestcases({ title = '', description = '', language = 'cpp', apiKey }) {
   if (apiKey) {
     try {
-      const prompt = `You are a computer science professor creating LeetCode-style test cases for a programming problem.
+      const prompt = `You are a computer science professor creating standard competitive-programming test cases (like LeetCode or HackerRank) for an assignment.
 Title: "${title}"
 Description: "${description}"
 Language: ${language}
 
-Generate 2 or 3 standard, accurate test cases with input and expected output.
+Generate 2 or 3 standard, realistic test cases that can be fed into standard input (stdin) and verified against standard output (stdout).
+
 Rules:
-1. For inputs, provide clean values without raw escaped '\\n' strings (e.g. for two numbers use "10 20").
-2. The expected output must strictly be the mathematically or algorithmically correct answer.
-3. Provide a clear, educational explanation for each test case.
+1. Standard Input (input):
+   - For simple math/algorithm problems: Provide clean space-separated values (e.g. "10 20").
+   - For complex/management/data structure problems (e.g. Library, Student Records, Bank, Matrix, Arrays): Standardize the input with counts and space-separated lines (e.g. number of items on first line, followed by space-separated data).
+2. Expected Output (expectedOutput):
+   - Must strictly be the exact console output (stdout) that the problem specifies.
+   - For multi-line outputs or key-value reports, format each line cleanly.
+3. Explanation:
+   - Provide a clear, educational walkthrough of why this output is expected.
 
 Respond ONLY with a valid JSON array in this exact format:
 [
   {
-    "input": "10 20",
-    "expectedOutput": "20",
-    "explanation": "20 is greater than 10"
+    "input": "...",
+    "expectedOutput": "...",
+    "explanation": "..."
   }
 ]`;
 
@@ -1215,6 +1221,76 @@ Respond ONLY with a valid JSON array in this exact format:
   } else if (titleLower.includes('hello')) {
     return [
       { input: "", expectedOutput: "Hello World", explanation: "Standard greeting output" }
+    ];
+  }
+
+  // 11. Library / Book Borrowing System
+  if (titleLower.includes('librar') || titleLower.includes('borrow') || titleLower.includes('book')) {
+    return [
+      {
+        input: "10\n3 0 5 2 0 4 1 0 6 2\n4\nAlgorithms:42\nClean_Code:58\nDesign_Patterns:19\nNetworks:8",
+        expectedOutput: "Average: 2.30\nHighest: Clean_Code 58\nLowest: Networks 8\nZero Borrowers: 3\nMode: Clean_Code 58",
+        explanation: "10 members with total 23 borrows gives average 2.30. 3 members borrowed 0 books. Clean_Code has highest and mode borrowings (58)."
+      },
+      {
+        input: "4\n0 0 0 0\n3\nPython:15\nJava:15\nC:5",
+        expectedOutput: "Average: 0.00\nHighest: Python 15\nLowest: C 5\nZero Borrowers: 4\nMode: Python 15",
+        explanation: "All 4 members borrowed 0 books. Python and Java tied with 15 borrowings."
+      }
+    ];
+  }
+
+  // 12. Student Marks / Grading / Attendance
+  if (titleLower.includes('student') || titleLower.includes('mark') || titleLower.includes('grade') || titleLower.includes('attend')) {
+    return [
+      {
+        input: "5\n85 90 78 92 88",
+        expectedOutput: "Average: 86.60\nHighest: 92\nLowest: 78",
+        explanation: "5 marks with average 86.60, highest 92, and lowest 78."
+      },
+      {
+        input: "3\n50 60 70",
+        expectedOutput: "Average: 60.00\nHighest: 70\nLowest: 50",
+        explanation: "3 marks with average 60.00, highest 70, and lowest 50."
+      }
+    ];
+  }
+
+  // 13. Bank / Account / Transaction Management
+  if (titleLower.includes('bank') || titleLower.includes('account') || titleLower.includes('atm') || titleLower.includes('balance')) {
+    return [
+      {
+        input: "1000\ncredit 500\ndebit 200",
+        expectedOutput: "Final Balance: 1300",
+        explanation: "Initial 1000 + 500 credit - 200 debit = 1300 balance."
+      }
+    ];
+  }
+
+  // 14. Matrix / 2D Grid Operations
+  if (titleLower.includes('matrix') || titleLower.includes('grid')) {
+    return [
+      {
+        input: "2 2\n1 2\n3 4\n5 6\n7 8",
+        expectedOutput: "6 8\n10 12",
+        explanation: "Element-wise addition of two 2x2 matrices."
+      }
+    ];
+  }
+
+  // 15. Sorting / Array Algorithms
+  if (titleLower.includes('sort') || titleLower.includes('bubble') || titleLower.includes('quick') || titleLower.includes('merge')) {
+    return [
+      {
+        input: "5\n64 34 25 12 22",
+        expectedOutput: "12 22 25 34 64",
+        explanation: "Array sorted in ascending order."
+      },
+      {
+        input: "4\n5 1 4 2",
+        expectedOutput: "1 2 4 5",
+        explanation: "Array sorted in ascending order."
+      }
     ];
   }
 
