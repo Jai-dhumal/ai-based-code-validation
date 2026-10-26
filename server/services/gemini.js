@@ -1136,57 +1136,80 @@ Respond ONLY with a valid JSON array in this exact format:
   // Intelligent LeetCode-Style Heuristic Problem Analyzer Fallback
   const titleLower = (title + ' ' + description).toLowerCase();
 
-  // 1. Greatest / Maximum of Numbers
-  if (titleLower.includes('great') || titleLower.includes('max') || titleLower.includes('larger')) {
-    if (titleLower.includes('three') || titleLower.includes('3')) {
-      return [
-        { input: "10 20 30", expectedOutput: "30", explanation: "30 is the greatest among 10, 20, and 30" },
-        { input: "55 12 40", expectedOutput: "55", explanation: "55 is the greatest among 55, 12, and 40" }
-      ];
-    }
+  // 1. Library / Book Borrowing System (Prioritized before arithmetic keywords)
+  if (titleLower.includes('librar') || titleLower.includes('borrow') || titleLower.includes('book')) {
     return [
-      { input: "10 20", expectedOutput: "20", explanation: "Between 10 and 20, 20 is the greatest" },
-      { input: "45 12", expectedOutput: "45", explanation: "Between 45 and 12, 45 is the greatest" }
+      {
+        input: "10 3 0 5 2 0 4 1 0 6 2 4 Algorithms:42 Clean_Code:58 Design_Patterns:19 Networks:8",
+        expectedOutput: "Average: 2.30 | Highest: Clean_Code 58 | Lowest: Networks 8 | Zero: 3 | Mode: Clean_Code 58",
+        explanation: "10 members (23 total borrows, avg 2.30), 3 zero-borrowers. Highest and mode is Clean_Code (58)."
+      },
+      {
+        input: "4 0 0 0 0 3 Python:15 Java:15 C:5",
+        expectedOutput: "Average: 0.00 | Highest: Python 15 | Lowest: C 5 | Zero: 4 | Mode: Python 15",
+        explanation: "All 4 members borrowed 0 books. Python and Java tied with 15 borrowings."
+      }
     ];
   }
 
-  // 2. Smallest / Minimum of Numbers
-  if (titleLower.includes('small') || titleLower.includes('min') || titleLower.includes('least')) {
+  // 2. Student Marks / Grading / Attendance
+  if (titleLower.includes('student') || titleLower.includes('mark') || titleLower.includes('grade') || titleLower.includes('attend')) {
     return [
-      { input: "10 20", expectedOutput: "10", explanation: "Between 10 and 20, 10 is the smallest" },
-      { input: "45 12", expectedOutput: "12", explanation: "Between 45 and 12, 12 is the smallest" }
+      {
+        input: "5 85 90 78 92 88",
+        expectedOutput: "Average: 86.60 | Highest: 92 | Lowest: 78",
+        explanation: "5 marks with average 86.60, highest 92, and lowest 78."
+      },
+      {
+        input: "3 50 60 70",
+        expectedOutput: "Average: 60.00 | Highest: 70 | Lowest: 50",
+        explanation: "3 marks with average 60.00, highest 70, and lowest 50."
+      }
     ];
   }
 
-  // 3. Even or Odd
-  if (titleLower.includes('even') || titleLower.includes('odd')) {
+  // 3. Bank / Account / Transaction Management
+  if (titleLower.includes('bank') || titleLower.includes('account') || titleLower.includes('atm') || titleLower.includes('balance')) {
     return [
-      { input: "4", expectedOutput: "even", explanation: "4 is divisible by 2" },
-      { input: "7", expectedOutput: "odd", explanation: "7 is not divisible by 2" }
+      {
+        input: "1000 credit 500 debit 200",
+        expectedOutput: "Final Balance: 1300",
+        explanation: "Initial 1000 + 500 credit - 200 debit = 1300 balance."
+      }
     ];
   }
 
-  // 4. Sum / Addition
-  if (titleLower.includes('sum') || titleLower.includes('add')) {
+  // 4. Matrix / 2D Grid Operations
+  if (titleLower.includes('matrix') || titleLower.includes('grid')) {
     return [
-      { input: "10 20", expectedOutput: "30", explanation: "10 + 20 = 30" },
-      { input: "5 15", expectedOutput: "20", explanation: "5 + 15 = 20" }
+      {
+        input: "2 2 1 2 3 4 5 6 7 8",
+        expectedOutput: "6 8 10 12",
+        explanation: "Element-wise addition of two 2x2 matrices."
+      }
     ];
   }
 
-  // 5. Factorial
-  if (titleLower.includes('factor')) {
+  // 5. Sorting / Searching / Array Algorithms
+  if (titleLower.includes('sort') || titleLower.includes('search') || titleLower.includes('bubble') || titleLower.includes('quick') || titleLower.includes('merge') || titleLower.includes('array')) {
     return [
-      { input: "5", expectedOutput: "120", explanation: "5! = 5 * 4 * 3 * 2 * 1 = 120" },
-      { input: "3", expectedOutput: "6", explanation: "3! = 6" }
+      {
+        input: "5 64 34 25 12 22",
+        expectedOutput: "12 22 25 34 64",
+        explanation: "Array sorted in ascending order."
+      },
+      {
+        input: "4 5 1 4 2",
+        expectedOutput: "1 2 4 5",
+        explanation: "Array sorted in ascending order."
+      }
     ];
   }
 
-  // 6. Prime Number
-  if (titleLower.includes('prime')) {
+  // 6. Binary Search Tree / BST
+  if (titleLower.includes('binary search tree') || titleLower.includes('bst') || titleLower.includes('tree')) {
     return [
-      { input: "7", expectedOutput: "prime", explanation: "7 has only 1 and 7 as divisors" },
-      { input: "8", expectedOutput: "not prime", explanation: "8 is divisible by 2 and 4" }
+      { input: "50 30 70 20 40 60 80", expectedOutput: "20 30 40 50 60 70 80", explanation: "In-order traversal yields sorted values" }
     ];
   }
 
@@ -1198,7 +1221,23 @@ Respond ONLY with a valid JSON array in this exact format:
     ];
   }
 
-  // 8. Reverse String / Reverse Number
+  // 8. Factorial
+  if (titleLower.includes('factor')) {
+    return [
+      { input: "5", expectedOutput: "120", explanation: "5! = 5 * 4 * 3 * 2 * 1 = 120" },
+      { input: "3", expectedOutput: "6", explanation: "3! = 6" }
+    ];
+  }
+
+  // 9. Prime Number
+  if (titleLower.includes('prime')) {
+    return [
+      { input: "7", expectedOutput: "prime", explanation: "7 has only 1 and 7 as divisors" },
+      { input: "8", expectedOutput: "not prime", explanation: "8 is divisible by 2 and 4" }
+    ];
+  }
+
+  // 10. Reverse String / Reverse Number
   if (titleLower.includes('revers')) {
     return [
       { input: "hello", expectedOutput: "olleh", explanation: "Reversed string is 'olleh'" },
@@ -1206,14 +1245,45 @@ Respond ONLY with a valid JSON array in this exact format:
     ];
   }
 
-  // 9. Binary Search Tree / BST
-  if (titleLower.includes('binary search tree') || titleLower.includes('bst')) {
+  // 11. Even or Odd
+  if (/\b(even|odd)\b/i.test(titleLower)) {
     return [
-      { input: "50 30 70 20 40 60 80", expectedOutput: "20 30 40 50 60 70 80", explanation: "In-order traversal yields sorted values" }
+      { input: "4", expectedOutput: "even", explanation: "4 is divisible by 2" },
+      { input: "7", expectedOutput: "odd", explanation: "7 is not divisible by 2" }
     ];
   }
 
-  // 10. Greetings / Hello World
+  // 12. Sum / Addition
+  if (/\b(sum|addition|add)\b/i.test(titleLower)) {
+    return [
+      { input: "10 20", expectedOutput: "30", explanation: "10 + 20 = 30" },
+      { input: "5 15", expectedOutput: "20", explanation: "5 + 15 = 20" }
+    ];
+  }
+
+  // 13. Greatest / Maximum of Numbers (Strict word boundaries to avoid false matching)
+  if (/\b(greatest|maximum|max|larger|largest)\b/i.test(titleLower)) {
+    if (/\b(three|3)\b/i.test(titleLower)) {
+      return [
+        { input: "10 20 30", expectedOutput: "30", explanation: "30 is the greatest among 10, 20, and 30" },
+        { input: "55 12 40", expectedOutput: "55", explanation: "55 is the greatest among 55, 12, and 40" }
+      ];
+    }
+    return [
+      { input: "10 20", expectedOutput: "20", explanation: "Between 10 and 20, 20 is the greatest" },
+      { input: "45 12", expectedOutput: "45", explanation: "Between 45 and 12, 45 is the greatest" }
+    ];
+  }
+
+  // 14. Smallest / Minimum of Numbers (Strict word boundaries to avoid false matching on 'determine')
+  if (/\b(smallest|minimum|min|least)\b/i.test(titleLower)) {
+    return [
+      { input: "10 20", expectedOutput: "10", explanation: "Between 10 and 20, 10 is the smallest" },
+      { input: "45 12", expectedOutput: "12", explanation: "Between 45 and 12, 12 is the smallest" }
+    ];
+  }
+
+  // 15. Greetings / Hello World
   if (titleLower.includes('jay ganesh')) {
     return [
       { input: "", expectedOutput: "Jay Ganesh", explanation: "Prints devotional greeting" }
@@ -1221,76 +1291,6 @@ Respond ONLY with a valid JSON array in this exact format:
   } else if (titleLower.includes('hello')) {
     return [
       { input: "", expectedOutput: "Hello World", explanation: "Standard greeting output" }
-    ];
-  }
-
-  // 11. Library / Book Borrowing System
-  if (titleLower.includes('librar') || titleLower.includes('borrow') || titleLower.includes('book')) {
-    return [
-      {
-        input: "10\n3 0 5 2 0 4 1 0 6 2\n4\nAlgorithms:42\nClean_Code:58\nDesign_Patterns:19\nNetworks:8",
-        expectedOutput: "Average: 2.30\nHighest: Clean_Code 58\nLowest: Networks 8\nZero Borrowers: 3\nMode: Clean_Code 58",
-        explanation: "10 members with total 23 borrows gives average 2.30. 3 members borrowed 0 books. Clean_Code has highest and mode borrowings (58)."
-      },
-      {
-        input: "4\n0 0 0 0\n3\nPython:15\nJava:15\nC:5",
-        expectedOutput: "Average: 0.00\nHighest: Python 15\nLowest: C 5\nZero Borrowers: 4\nMode: Python 15",
-        explanation: "All 4 members borrowed 0 books. Python and Java tied with 15 borrowings."
-      }
-    ];
-  }
-
-  // 12. Student Marks / Grading / Attendance
-  if (titleLower.includes('student') || titleLower.includes('mark') || titleLower.includes('grade') || titleLower.includes('attend')) {
-    return [
-      {
-        input: "5\n85 90 78 92 88",
-        expectedOutput: "Average: 86.60\nHighest: 92\nLowest: 78",
-        explanation: "5 marks with average 86.60, highest 92, and lowest 78."
-      },
-      {
-        input: "3\n50 60 70",
-        expectedOutput: "Average: 60.00\nHighest: 70\nLowest: 50",
-        explanation: "3 marks with average 60.00, highest 70, and lowest 50."
-      }
-    ];
-  }
-
-  // 13. Bank / Account / Transaction Management
-  if (titleLower.includes('bank') || titleLower.includes('account') || titleLower.includes('atm') || titleLower.includes('balance')) {
-    return [
-      {
-        input: "1000\ncredit 500\ndebit 200",
-        expectedOutput: "Final Balance: 1300",
-        explanation: "Initial 1000 + 500 credit - 200 debit = 1300 balance."
-      }
-    ];
-  }
-
-  // 14. Matrix / 2D Grid Operations
-  if (titleLower.includes('matrix') || titleLower.includes('grid')) {
-    return [
-      {
-        input: "2 2\n1 2\n3 4\n5 6\n7 8",
-        expectedOutput: "6 8\n10 12",
-        explanation: "Element-wise addition of two 2x2 matrices."
-      }
-    ];
-  }
-
-  // 15. Sorting / Array Algorithms
-  if (titleLower.includes('sort') || titleLower.includes('bubble') || titleLower.includes('quick') || titleLower.includes('merge')) {
-    return [
-      {
-        input: "5\n64 34 25 12 22",
-        expectedOutput: "12 22 25 34 64",
-        explanation: "Array sorted in ascending order."
-      },
-      {
-        input: "4\n5 1 4 2",
-        expectedOutput: "1 2 4 5",
-        explanation: "Array sorted in ascending order."
-      }
     ];
   }
 
