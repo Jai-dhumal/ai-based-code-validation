@@ -1,5 +1,37 @@
 // Gemini AI Service for Tier-2 Deep Semantic Analysis and Code-Tailored Dynamic Quiz Generation
 
+const GEMINI_MODELS = [
+  'gemini-flash-latest',
+  'gemini-2.5-flash-lite',
+  'gemini-pro-latest',
+  'gemini-1.5-flash'
+];
+
+async function queryGeminiWithFallback(apiKey, payload) {
+  if (!apiKey) return null;
+  for (const model of GEMINI_MODELS) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+      if (res.ok) {
+        const data = await res.json();
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return text;
+      }
+    } catch (e) {
+      // try next model
+    }
+  }
+  return null;
+}
+
 export async function runTier2Evaluation({ code, referenceCode, assignmentTitle, language, apiKey }) {
   if (apiKey) {
     try {
@@ -32,26 +64,16 @@ Respond ONLY with valid JSON in this exact structure:
 }
 `;
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.2,
-            responseMimeType: 'application/json'
-          }
-        })
+      const rawText = await queryGeminiWithFallback(apiKey, {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.2,
+          responseMimeType: 'application/json'
+        }
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (rawText) {
-          return JSON.parse(rawText);
-        }
-      } else {
-        console.warn('Gemini API call failed with status:', response.status, 'Checking for OpenAI fallback...');
+      if (rawText) {
+        return JSON.parse(rawText);
       }
     } catch (err) {
       console.warn('Gemini API request error:', err.message, 'Checking for OpenAI fallback...');
@@ -281,29 +303,19 @@ Respond ONLY with valid JSON array:
 ]
 `;
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            responseMimeType: 'application/json'
-          }
-        })
+      const rawText = await queryGeminiWithFallback(apiKey, {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.7,
+          responseMimeType: 'application/json'
+        }
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (rawText) {
-          const parsed = JSON.parse(rawText);
-          if (Array.isArray(parsed) && parsed.length >= 8) {
-            return shuffleOptionsAndQuestions(parsed, 10);
-          }
+      if (rawText) {
+        const parsed = JSON.parse(rawText);
+        if (Array.isArray(parsed) && parsed.length >= 8) {
+          return shuffleOptionsAndQuestions(parsed, 10);
         }
-      } else {
-        console.warn('Gemini quiz generation failed with status:', response.status, 'Checking OpenAI fallback...');
       }
     } catch (err) {
       console.warn('Gemini quiz generation error:', err.message, 'Checking OpenAI fallback...');
@@ -1102,30 +1114,22 @@ Respond ONLY with a valid JSON array in this exact format:
   }
 ]`;
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.2,
-            responseMimeType: 'application/json'
-          }
-        })
+      const rawText = await queryGeminiWithFallback(apiKey, {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.2,
+          responseMimeType: 'application/json'
+        }
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (rawText) {
-          const parsed = JSON.parse(rawText);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed.map(tc => ({
-              input: String(tc.input ?? '').replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').trim(),
-              expectedOutput: String(tc.expectedOutput ?? '').trim(),
-              explanation: String(tc.explanation ?? '').trim()
-            }));
-          }
+      if (rawText) {
+        const parsed = JSON.parse(rawText);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(tc => ({
+            input: String(tc.input ?? '').replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').trim(),
+            expectedOutput: String(tc.expectedOutput ?? '').replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').trim(),
+            explanation: String(tc.explanation ?? '').trim()
+          }));
         }
       }
     } catch (e) {
