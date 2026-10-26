@@ -518,8 +518,8 @@ export default function TeacherPortal({
         const data = await res.json();
         if (Array.isArray(data.testcases) && data.testcases.length > 0) {
           setTestcases(data.testcases.map(tc => ({
-            input: String(tc.input ?? '').replace(/\\r\\n/g, ' ').replace(/\\n/g, ' ').replace(/\r\n/g, ' ').replace(/\n/g, ' ').trim(),
-            expectedOutput: String(tc.expectedOutput ?? '').trim(),
+            input: String(tc.input ?? '').replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').trim(),
+            expectedOutput: String(tc.expectedOutput ?? '').replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').trim(),
             explanation: String(tc.explanation ?? '').trim()
           })));
         }
@@ -2595,25 +2595,25 @@ export default function TeacherPortal({
                         </button>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="text"
+                        <textarea
+                          rows={2}
                           placeholder="Input (stdin)"
-                          value={tc.input}
+                          value={tc.input || ''}
                           onChange={(e) => {
                             const val = e.target.value;
                             setTestcases(prev => prev.map((t, i) => i === idx ? { ...t, input: val } : t));
                           }}
-                          className="p-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-mono text-slate-900 dark:text-white"
+                          className="p-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-mono text-slate-900 dark:text-white resize-y"
                         />
-                        <input
-                          type="text"
+                        <textarea
+                          rows={2}
                           placeholder="Expected Output"
-                          value={tc.expectedOutput}
+                          value={tc.expectedOutput || ''}
                           onChange={(e) => {
                             const val = e.target.value;
                             setTestcases(prev => prev.map((t, i) => i === idx ? { ...t, expectedOutput: val } : t));
                           }}
-                          className="p-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-mono text-slate-900 dark:text-white"
+                          className="p-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-mono text-slate-900 dark:text-white resize-y"
                         />
                       </div>
                     </div>
@@ -2828,25 +2828,25 @@ export default function TeacherPortal({
                         </button>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="text"
-                          placeholder="Input (stdin, e.g. 10 20)"
+                        <textarea
+                          rows={2}
+                          placeholder="Input (stdin, e.g. 1\n10\n1\n20\n2\n3\n5)"
                           value={tc.input || ''}
                           onChange={(e) => {
                             const val = e.target.value;
                             setTestcases(prev => prev.map((t, i) => i === idx ? { ...t, input: val } : t));
                           }}
-                          className="p-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-mono text-slate-900 dark:text-white"
+                          className="p-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-mono text-slate-900 dark:text-white resize-y"
                         />
-                        <input
-                          type="text"
-                          placeholder="Expected Output (e.g. 20)"
+                        <textarea
+                          rows={2}
+                          placeholder="Expected Output (e.g. Event 10 added...)"
                           value={tc.expectedOutput || ''}
                           onChange={(e) => {
                             const val = e.target.value;
                             setTestcases(prev => prev.map((t, i) => i === idx ? { ...t, expectedOutput: val } : t));
                           }}
-                          className="p-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-mono text-slate-900 dark:text-white"
+                          className="p-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-mono text-slate-900 dark:text-white resize-y"
                         />
                       </div>
                     </div>

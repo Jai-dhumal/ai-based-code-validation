@@ -1136,7 +1136,84 @@ Respond ONLY with a valid JSON array in this exact format:
   // Intelligent LeetCode-Style Heuristic Problem Analyzer Fallback
   const titleLower = (title + ' ' + description).toLowerCase();
 
-  // 1. Library / Book Borrowing System (Prioritized before arithmetic keywords)
+  // 1. Queue / Real-Time Event Processing System / Job Scheduling (FIFO)
+  if (titleLower.includes('queue') || titleLower.includes('event processing') || titleLower.includes('fifo') || titleLower.includes('job scheduling') || titleLower.includes('event queue')) {
+    return [
+      {
+        input: "1\n10\n1\n20\n1\n30\n2\n3\n5",
+        expectedOutput: "Event 10 added to queue.\nEvent 20 added to queue.\nEvent 30 added to queue.\nProcessing event: 10\nPending events: 20 30\nProgram terminated.",
+        explanation: "Adds events 10, 20, 30. Processes oldest event 10. Displays pending events 20 and 30, then exits."
+      },
+      {
+        input: "1\n50\n1\n60\n4\n50\n3\n5",
+        expectedOutput: "Event 50 added to queue.\nEvent 60 added to queue.\nEvent 50 canceled.\nPending events: 60\nProgram terminated.",
+        explanation: "Adds events 50, 60. Cancels event 50. Displays remaining pending event 60, then exits."
+      }
+    ];
+  }
+
+  // 2. Stack / Expression Conversion & Evaluation / Balancing Parentheses (LIFO)
+  if (titleLower.includes('stack') || titleLower.includes('postfix') || titleLower.includes('infix') || titleLower.includes('parenthes') || titleLower.includes('lifo')) {
+    if (titleLower.includes('infix') || titleLower.includes('postfix')) {
+      return [
+        {
+          input: "(A+B)*(C-D)",
+          expectedOutput: "AB+CD-*",
+          explanation: "Infix to Postfix conversion using Stack."
+        },
+        {
+          input: "A+B*C",
+          expectedOutput: "ABC*+",
+          explanation: "Infix to Postfix with operator precedence."
+        }
+      ];
+    }
+    if (titleLower.includes('parenthes') || titleLower.includes('balanc')) {
+      return [
+        {
+          input: "{[()]}",
+          expectedOutput: "Balanced",
+          explanation: "All opening brackets have corresponding matching closing brackets in correct order."
+        },
+        {
+          input: "{[(])}",
+          expectedOutput: "Not Balanced",
+          explanation: "Mismatched bracket closing order."
+        }
+      ];
+    }
+    return [
+      {
+        input: "1\n10\n1\n20\n2\n3\n4",
+        expectedOutput: "Pushed: 10\nPushed: 20\nPopped: 20\nTop: 10\nProgram terminated.",
+        explanation: "Pushes 10 and 20, pops 20, top element is 10."
+      }
+    ];
+  }
+
+  // 3. Linked List (Singly, Doubly, Circular, Polynomial)
+  if (titleLower.includes('linked list') || titleLower.includes('linkedlist') || titleLower.includes('singly') || titleLower.includes('doubly') || titleLower.includes('polynomial')) {
+    return [
+      {
+        input: "1\n10\n1\n20\n1\n30\n3\n5",
+        expectedOutput: "Inserted: 10\nInserted: 20\nInserted: 30\nList: 10 -> 20 -> 30\nProgram terminated.",
+        explanation: "Inserts nodes 10, 20, 30 at end of linked list and displays nodes."
+      }
+    ];
+  }
+
+  // 4. Graph Algorithms (Dijkstra, BFS, DFS, MST)
+  if (titleLower.includes('dijkstra') || titleLower.includes('shortest path') || titleLower.includes('graph') || titleLower.includes('bfs') || titleLower.includes('dfs') || titleLower.includes('mst') || titleLower.includes('kruskal') || titleLower.includes('prim')) {
+    return [
+      {
+        input: "5 6\n0 1 4\n0 2 1\n2 1 2\n1 3 1\n2 3 5\n3 4 3\n0",
+        expectedOutput: "Vertex 0: 0\nVertex 1: 3\nVertex 2: 1\nVertex 3: 4\nVertex 4: 7",
+        explanation: "Shortest distances from source vertex 0 to all vertices."
+      }
+    ];
+  }
+
+  // 5. Library / Book Borrowing System (Prioritized before arithmetic keywords)
   if (titleLower.includes('librar') || titleLower.includes('borrow') || titleLower.includes('book')) {
     return [
       {
@@ -1253,8 +1330,11 @@ Respond ONLY with a valid JSON array in this exact format:
     ];
   }
 
-  // 12. Sum / Addition
-  if (/\b(sum|addition|add)\b/i.test(titleLower)) {
+  // 12. Sum / Addition (Never match on data structure actions like 'add an event')
+  if (
+    /\b(sum of|calculate sum|find sum|summation|addition of)\b/i.test(titleLower) ||
+    (/\b(sum|addition)\b/i.test(titleLower) && !/\b(queue|stack|event|list|node|tree|graph|record|item|element)\b/i.test(titleLower))
+  ) {
     return [
       { input: "10 20", expectedOutput: "30", explanation: "10 + 20 = 30" },
       { input: "5 15", expectedOutput: "20", explanation: "5 + 15 = 20" }

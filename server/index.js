@@ -1338,6 +1338,13 @@ async function validateFunctionalCorrectness({ code, language, assignment, stdin
         const actualTcOut = (tcExec.stdout || '').toLowerCase();
         let tcPassed = actualTcOut.includes(tcExpected) || actualTcOut.trim() === tcExpected;
         if (!tcPassed) {
+          const normExp = tcExpected.replace(/\s+/g, ' ').trim();
+          const normAct = actualTcOut.replace(/\s+/g, ' ').trim();
+          if (normAct.includes(normExp) || normAct === normExp) {
+            tcPassed = true;
+          }
+        }
+        if (!tcPassed) {
           // Boolean & parity equivalence check
           if (
             (tcExpected === 'even' && (actualTcOut.includes('true') || actualTcOut.includes('even'))) ||
@@ -1524,6 +1531,13 @@ app.post('/api/compile/testcases', async (req, res) => {
           const expNorm = tcExpected.toLowerCase();
           const actNorm = actualClean.toLowerCase();
           passed = actNorm.includes(expNorm) || actNorm === expNorm;
+          if (!passed) {
+            const normExp = expNorm.replace(/\s+/g, ' ').trim();
+            const normAct = actNorm.replace(/\s+/g, ' ').trim();
+            if (normAct.includes(normExp) || normAct === normExp) {
+              passed = true;
+            }
+          }
           if (!passed) {
             // Parity and boolean equivalence
             if (
