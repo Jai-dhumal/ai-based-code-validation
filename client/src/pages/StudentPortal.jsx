@@ -619,8 +619,9 @@ export default function StudentPortal({
     setIsRunningCode(true);
     setShowConsole(true);
 
-    // Case A: Custom input execution from stdin tab
-    if (customStdin !== null && singleCaseIdx === null) {
+    // Case A: Custom input execution from stdin tab or explicit customStdin
+    if (singleCaseIdx === null && (customStdin !== null || consoleTab === 'stdin')) {
+      const activeStdin = customStdin !== null ? customStdin : (stdinInput || '');
       setConsoleTab('output');
       setConsoleOutput(null);
 
@@ -631,12 +632,19 @@ export default function StudentPortal({
           body: JSON.stringify({
             language: selectedLanguage,
             code,
-            stdin: customStdin
+            stdin: activeStdin
           })
         });
 
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Execution failed');
+        const contentType = res.headers.get('content-type') || '';
+        let data;
+        if (contentType.includes('application/json')) {
+          data = await res.json();
+        } else {
+          const text = await res.text();
+          throw new Error(text || `Server error (${res.status})`);
+        }
+        if (!res.ok) throw new Error(data.stderr || data.error || 'Execution failed');
         setConsoleOutput(data);
       } catch (err) {
         setConsoleOutput({
@@ -655,21 +663,37 @@ export default function StudentPortal({
     if (singleCaseIdx !== null) {
       setActiveRunningCase(singleCaseIdx);
       try {
-        const res = await fetch('/api/compile', {
+        const cases = getTestCases();
+        const targetCase = cases[singleCaseIdx] || { input: customStdin || '', expectedOutput: '(Any)' };
+        const res = await fetch('/api/compile/testcases', {
           method: 'POST',
           headers: getAuthHeaders(true),
           body: JSON.stringify({
             language: selectedLanguage,
             code,
-            stdin: customStdin || ''
+            testcases: [targetCase]
           })
         });
-        const data = await res.json();
-        const cases = getTestCases();
-        const targetCase = cases[singleCaseIdx];
-        const expected = (targetCase?.expectedOutput || '').trim().toLowerCase();
-        const actual = (data.stdout || '').trim().toLowerCase();
-        const passed = data.status === 'Accepted' && (!expected || expected === '(any)' || actual.includes(expected));
+
+        const contentType = res.headers.get('content-type') || '';
+        let data;
+        if (contentType.includes('application/json')) {
+          data = await res.json();
+        } else {
+          const text = await res.text();
+          throw new Error(text || `Server error (${res.status})`);
+        }
+
+        const singleResult = data.results && data.results[0] ? data.results[0] : {
+          caseIndex: singleCaseIdx + 1,
+          input: targetCase.input || '',
+          expectedOutput: targetCase.expectedOutput || '',
+          actualOutput: '',
+          stderr: data.compileError || data.error || 'Failed',
+          passed: false,
+          status: data.hasCompileError ? 'Compile Error' : 'Runtime Error',
+          time: '0.00'
+        };
 
         setTestcaseResults(prev => {
           const existing = prev?.results ? [...prev.results] : cases.map((c, i) => ({
@@ -682,20 +706,14 @@ export default function StudentPortal({
             status: 'Pending'
           }));
           existing[singleCaseIdx] = {
-            caseIndex: singleCaseIdx + 1,
-            input: targetCase?.input || '',
-            expectedOutput: targetCase?.expectedOutput || '',
-            actualOutput: data.stdout || '',
-            stderr: data.stderr || '',
-            passed,
-            status: data.status === 'Runtime Error' ? 'Runtime Error' : (passed ? 'Accepted' : 'Wrong Answer'),
-            time: data.time
+            ...singleResult,
+            caseIndex: singleCaseIdx + 1
           };
           const passedCount = existing.filter(r => r.passed).length;
           return {
             allPassed: passedCount === existing.length,
-            hasCompileError: data.status === 'Compile Error',
-            compileError: data.status === 'Compile Error' ? data.stderr : '',
+            hasCompileError: data.hasCompileError || false,
+            compileError: data.compileError || '',
             total: existing.length,
             passedCount,
             results: existing
@@ -716,9 +734,9 @@ export default function StudentPortal({
     if (testcases.length === 0) {
       // If assignment has no predefined testcases, execute program directly and display stdout/stderr in Output tab
       setConsoleTab('output');
+      setConsoleOutput(null);
       try {
-        setIsRunningCode(true);
-        const res = await fetch('/api/compile/run', {
+        const res = await fetch('/api/compile', {
           method: 'POST',
           headers: getAuthHeaders(true),
           body: JSON.stringify({
@@ -727,7 +745,14 @@ export default function StudentPortal({
             stdin: stdinInput || ''
           })
         });
-        const data = await res.json();
+        const contentType = res.headers.get('content-type') || '';
+        let data;
+        if (contentType.includes('application/json')) {
+          data = await res.json();
+        } else {
+          const text = await res.text();
+          throw new Error(text || `Server error (${res.status})`);
+        }
         setConsoleOutput(data);
       } catch (err) {
         setConsoleOutput({
@@ -755,7 +780,14 @@ export default function StudentPortal({
         })
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get('content-type') || '';
+      let data;
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || `Server error (${res.status})`);
+      }
       if (!res.ok) throw new Error(data.error || 'Execution failed');
       setTestcaseResults(data);
       if (data.hasCompileError) {
@@ -767,6 +799,7 @@ export default function StudentPortal({
         });
       }
     } catch (err) {
+      console.error('Testcases execution failed:', err);
       setTestcaseResults({
         allPassed: false,
         hasCompileError: true,
@@ -1899,7 +1932,7 @@ export default function StudentPortal({
                   <div className="flex justify-end">
                     <button
                       type="button"
-                      onClick={() => handleRunCode()}
+                      onClick={() => handleRunCode(stdinInput || '')}
                       disabled={isRunningCode}
                       className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition"
                     >

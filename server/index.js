@@ -1124,6 +1124,108 @@ function getPythonCommand() {
   return 'python';
 }
 
+// Reusable output normalization and comparison helpers
+export function normalizeOutput(str) {
+  if (str == null) return '';
+  let s = String(str);
+  s = s.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\\r/g, '\n');
+  s = s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  return s;
+}
+
+export function compareOutputs(actualRaw, expectedRaw) {
+  const actualNorm = normalizeOutput(actualRaw);
+  const expectedNorm = normalizeOutput(expectedRaw);
+
+  const actualTrim = actualNorm.trim();
+  const expectedTrim = expectedNorm.trim();
+
+  // If expected is empty or any, it passes
+  if (!expectedTrim || expectedTrim === '(Any)' || expectedTrim.toLowerCase() === '(any)' || expectedTrim.toLowerCase() === 'sample output') {
+    return { passed: true, reason: 'Matched (any)' };
+  }
+
+  // 1. Exact match
+  if (actualTrim === expectedTrim) {
+    return { passed: true, reason: 'Exact match' };
+  }
+
+  // 2. Case-insensitive exact match
+  if (actualTrim.toLowerCase() === expectedTrim.toLowerCase()) {
+    return { passed: true, reason: 'Case-insensitive exact match' };
+  }
+
+  // 3. Line-by-line comparison ignoring trailing whitespace on each line
+  const actualLines = actualNorm.split('\n').map(l => l.trimEnd()).filter(l => l.trim().length > 0);
+  const expectedLines = expectedNorm.split('\n').map(l => l.trimEnd()).filter(l => l.trim().length > 0);
+
+  if (actualLines.length === expectedLines.length) {
+    const allLinesMatch = expectedLines.every((expLine, idx) => {
+      const actLine = actualLines[idx];
+      return actLine.toLowerCase() === expLine.toLowerCase() || actLine.trim().toLowerCase() === expLine.trim().toLowerCase();
+    });
+    if (allLinesMatch) {
+      return { passed: true, reason: 'Line-by-line match' };
+    }
+  }
+
+  // 4. Normalized whitespace match (collapse multiple whitespace/newlines into single space)
+  const actCollapsed = actualTrim.replace(/\s+/g, ' ').toLowerCase();
+  const expCollapsed = expectedTrim.replace(/\s+/g, ' ').toLowerCase();
+  if (actCollapsed === expCollapsed) {
+    return { passed: true, reason: 'Whitespace-collapsed match' };
+  }
+
+  // 5. Expected output contained as substring in actual output
+  if (actualTrim.toLowerCase().includes(expectedTrim.toLowerCase()) || actCollapsed.includes(expCollapsed)) {
+    return { passed: true, reason: 'Substring match' };
+  }
+
+  // 6. Expected lines subsequence match (filters interactive prompts like "Enter choice:")
+  if (expectedLines.length > 0 && actualLines.length >= expectedLines.length) {
+    let expIdx = 0;
+    for (let actIdx = 0; actIdx < actualLines.length && expIdx < expectedLines.length; actIdx++) {
+      const actL = actualLines[actIdx].toLowerCase();
+      const expL = expectedLines[expIdx].toLowerCase();
+      if (actL.includes(expL) || actL === expL) {
+        expIdx++;
+      }
+    }
+    if (expIdx === expectedLines.length) {
+      return { passed: true, reason: 'Line subsequence match' };
+    }
+  }
+
+  // 7. Boolean / parity equivalence check (e.g. true vs even, false vs odd)
+  const actLow = actualTrim.toLowerCase();
+  const expLow = expectedTrim.toLowerCase();
+  if (
+    (expLow === 'even' && (actLow.includes('true') || actLow.includes('even'))) ||
+    (expLow === 'odd' && (actLow.includes('false') || actLow.includes('odd'))) ||
+    (expLow === 'true' && (actLow.includes('even') || actLow.includes('true'))) ||
+    (expLow === 'false' && (actLow.includes('odd') || actLow.includes('false')))
+  ) {
+    return { passed: true, reason: 'Parity / Boolean equivalence' };
+  }
+
+  // 8. Numeric sequence match: If expected consists of numbers (e.g. "10 20 30" or "[10, 20, 30]")
+  const expNums = expectedTrim.match(/-?\d+(?:\.\d+)?/g);
+  const actNums = actualTrim.match(/-?\d+(?:\.\d+)?/g);
+  if (expNums && expNums.length > 0 && actNums && actNums.length >= expNums.length) {
+    let expPtr = 0;
+    for (let i = 0; i < actNums.length && expPtr < expNums.length; i++) {
+      if (actNums[i] === expNums[expPtr]) {
+        expPtr++;
+      }
+    }
+    if (expPtr === expNums.length && (actNums.length === expNums.length || expNums.length >= 2)) {
+      return { passed: true, reason: 'Numeric sequence match' };
+    }
+  }
+
+  return { passed: false, reason: 'Output mismatch' };
+}
+
 // Reusable program compiler & executor
 async function executeCodeInternal({ language = 'python', code = '', stdin = '' }) {
   const startTime = Date.now();
@@ -1133,7 +1235,7 @@ async function executeCodeInternal({ language = 'python', code = '', stdin = '' 
 
   try {
     if (!code || !code.trim()) {
-      return { stdout: '', stderr: 'Code is empty', status: 'Runtime Error', time: '0.00' };
+      return { stdout: '', stderr: 'Code is empty', status: 'Runtime Error', time: '0.00', memory: null };
     }
 
     const tmpId = `run_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -1161,7 +1263,7 @@ async function executeCodeInternal({ language = 'python', code = '', stdin = '' 
       runArgs = [srcFile];
     } else if (lang === 'cpp' || lang === 'c++') {
       srcFile = path.join(tmpDir, `${tmpId}.cpp`);
-      exeFile = path.join(tmpDir, `${tmpId}.exe`);
+      exeFile = os.platform() === 'win32' ? path.join(tmpDir, `${tmpId}.exe`) : path.join(tmpDir, tmpId);
       fs.writeFileSync(srcFile, runnableCode, 'utf8');
       compileCmd = 'g++';
       compileArgs = [srcFile, '-O2', '-o', exeFile];
@@ -1169,7 +1271,7 @@ async function executeCodeInternal({ language = 'python', code = '', stdin = '' 
       runArgs = [];
     } else if (lang === 'c') {
       srcFile = path.join(tmpDir, `${tmpId}.c`);
-      exeFile = path.join(tmpDir, `${tmpId}.exe`);
+      exeFile = os.platform() === 'win32' ? path.join(tmpDir, `${tmpId}.exe`) : path.join(tmpDir, tmpId);
       fs.writeFileSync(srcFile, runnableCode, 'utf8');
       compileCmd = 'gcc';
       compileArgs = [srcFile, '-O2', '-o', exeFile];
@@ -1195,10 +1297,24 @@ async function executeCodeInternal({ language = 'python', code = '', stdin = '' 
       };
     }
 
-    // Step 1: Compilation
+    // Step 1: Compilation (if required)
     if (compileCmd) {
       try {
         const cRes = spawnSync(compileCmd, compileArgs, { encoding: 'utf8', timeout: 12000 });
+        if (cRes.error) {
+          try {
+            if (srcFile && fs.existsSync(srcFile)) fs.unlinkSync(srcFile);
+            if (exeFile && fs.existsSync(exeFile)) fs.unlinkSync(exeFile);
+            if (javaDir && fs.existsSync(javaDir)) fs.rmSync(javaDir, { recursive: true, force: true });
+          } catch (e) {}
+          return {
+            stdout: '',
+            stderr: `Execution Provider Error: Compiler '${compileCmd}' is unavailable (${cRes.error.message || cRes.error.code})`,
+            status: 'Compiler Unavailable',
+            time: '0.00',
+            memory: null
+          };
+        }
         if (cRes.status !== 0) {
           const compErr = cRes.stderr || cRes.stdout || 'Compilation failed';
           try {
@@ -1214,6 +1330,12 @@ async function executeCodeInternal({ language = 'python', code = '', stdin = '' 
             memory: null
           };
         }
+        // Ensure execution permission on Unix
+        if (os.platform() !== 'win32' && exeFile && fs.existsSync(exeFile)) {
+          try {
+            fs.chmodSync(exeFile, 0o755);
+          } catch (e) {}
+        }
       } catch (err) {
         try {
           if (srcFile && fs.existsSync(srcFile)) fs.unlinkSync(srcFile);
@@ -1222,8 +1344,8 @@ async function executeCodeInternal({ language = 'python', code = '', stdin = '' 
         } catch (e) {}
         return {
           stdout: '',
-          stderr: `Compiler (${compileCmd}) unavailable: ${err.message}`,
-          status: 'Compile Error',
+          stderr: `Execution Provider Error: ${err.message}`,
+          status: 'Compiler Unavailable',
           time: '0.00',
           memory: null
         };
@@ -1235,9 +1357,10 @@ async function executeCodeInternal({ language = 'python', code = '', stdin = '' 
       let stdout = '';
       let stderr = '';
       let child;
+      let timedOut = false;
 
       try {
-        child = spawn(runCmd, runArgs, { timeout: 8000 });
+        child = spawn(runCmd, runArgs, { timeout: 10000 });
       } catch (err) {
         return resolve({
           stdout: '',
@@ -1248,10 +1371,18 @@ async function executeCodeInternal({ language = 'python', code = '', stdin = '' 
         });
       }
 
+      const timeoutTimer = setTimeout(() => {
+        timedOut = true;
+        try {
+          child.kill('SIGKILL');
+        } catch (e) {}
+      }, 10000);
+
       if (child.stdin) {
         try {
-          if (stdin) {
-            child.stdin.write(stdin);
+          if (stdin != null && String(stdin).length > 0) {
+            const s = String(stdin);
+            child.stdin.write(s.endsWith('\n') ? s : s + '\n');
           }
           child.stdin.end();
         } catch (e) {}
@@ -1261,6 +1392,7 @@ async function executeCodeInternal({ language = 'python', code = '', stdin = '' 
       child.stderr.on('data', (d) => { stderr += d.toString(); });
 
       const cleanup = () => {
+        clearTimeout(timeoutTimer);
         try {
           if (srcFile && fs.existsSync(srcFile)) fs.unlinkSync(srcFile);
           if (exeFile && fs.existsSync(exeFile)) fs.unlinkSync(exeFile);
@@ -1272,20 +1404,30 @@ async function executeCodeInternal({ language = 'python', code = '', stdin = '' 
         cleanup();
         resolve({
           stdout: '',
-          stderr: err.message,
+          stderr: `Runtime execution error: ${err.message}`,
           status: 'Runtime Error',
           time: ((Date.now() - startTime) / 1000).toFixed(2),
           memory: null
         });
       });
 
-      child.on('close', (exitCode) => {
+      child.on('close', (exitCode, signal) => {
         cleanup();
+        const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+        if (timedOut || signal === 'SIGTERM' || signal === 'SIGKILL') {
+          return resolve({
+            stdout: stdout.trim(),
+            stderr: 'Time Limit Exceeded (program took longer than 10.0 seconds)',
+            status: 'Time Limit Exceeded',
+            time: duration,
+            memory: null
+          });
+        }
         resolve({
           stdout: stdout.trim(),
           stderr: stderr.trim(),
-          status: exitCode === 0 ? 'Accepted' : (stderr ? 'Runtime Error' : 'Wrong Answer'),
-          time: ((Date.now() - startTime) / 1000).toFixed(2),
+          status: exitCode === 0 ? 'Accepted' : 'Runtime Error',
+          time: duration,
           memory: Math.round(1024 + Math.random() * 2048)
         });
       });
@@ -1321,10 +1463,10 @@ async function validateFunctionalCorrectness({ code, language, assignment, stdin
           tcInput = `${tokens[0]} 20`;
         }
       }
-      const tcExpected = (tc.expectedOutput != null ? String(tc.expectedOutput) : '').trim().toLowerCase();
+      const tcExpected = tc.expectedOutput != null ? String(tc.expectedOutput) : '';
 
       const tcExec = await executeCodeInternal({ language, code, stdin: tcInput });
-      if (tcExec.status === 'Compile Error' || tcExec.status === 'Runtime Error') {
+      if (tcExec.status === 'Compile Error' || tcExec.status === 'Compiler Unavailable' || tcExec.status === 'Runtime Error') {
         return {
           passed: false,
           reason: `Execution failed on Test Case ${i + 1} (${tcExec.status}): ${tcExec.stderr || tcExec.stdout || 'Program halted'}`,
@@ -1334,37 +1476,16 @@ async function validateFunctionalCorrectness({ code, language, assignment, stdin
         };
       }
 
-      if (tcExpected) {
-        const actualTcOut = (tcExec.stdout || '').toLowerCase();
-        let tcPassed = actualTcOut.includes(tcExpected) || actualTcOut.trim() === tcExpected;
-        if (!tcPassed) {
-          const normExp = tcExpected.replace(/\s+/g, ' ').trim();
-          const normAct = actualTcOut.replace(/\s+/g, ' ').trim();
-          if (normAct.includes(normExp) || normAct === normExp) {
-            tcPassed = true;
-          }
-        }
-        if (!tcPassed) {
-          // Boolean & parity equivalence check
-          if (
-            (tcExpected === 'even' && (actualTcOut.includes('true') || actualTcOut.includes('even'))) ||
-            (tcExpected === 'odd' && (actualTcOut.includes('false') || actualTcOut.includes('odd'))) ||
-            (tcExpected === 'true' && (actualTcOut.includes('even') || actualTcOut.includes('true'))) ||
-            (tcExpected === 'false' && (actualTcOut.includes('odd') || actualTcOut.includes('false')))
-          ) {
-            tcPassed = true;
-          }
-        }
-        if (!tcPassed) {
-          return {
-            passed: false,
-            reason: `Test Case ${i + 1} Failed: Expected output to contain "${tc.expectedOutput}", but received "${tcExec.stdout.trim() || '(no output)'}"`,
-            stdout: tcExec.stdout,
-            stderr: tcExec.stderr,
-            expected: tc.expectedOutput,
-            status: 'Wrong Output'
-          };
-        }
+      const matchResult = compareOutputs(tcExec.stdout, tcExpected);
+      if (!matchResult.passed) {
+        return {
+          passed: false,
+          reason: `Test Case ${i + 1} Failed: Expected output "${tc.expectedOutput}", but received "${tcExec.stdout.trim() || '(no output)'}"`,
+          stdout: tcExec.stdout,
+          stderr: tcExec.stderr,
+          expected: tc.expectedOutput,
+          status: 'Wrong Output'
+        };
       }
     }
   }
@@ -1372,7 +1493,7 @@ async function validateFunctionalCorrectness({ code, language, assignment, stdin
   // Run with custom stdin or default
   const execResult = await executeCodeInternal({ language, code, stdin });
   
-  if (execResult.status === 'Compile Error' || execResult.status === 'Runtime Error') {
+  if (execResult.status === 'Compile Error' || execResult.status === 'Compiler Unavailable' || execResult.status === 'Runtime Error') {
     return {
       passed: false,
       reason: `Program failed to execute (${execResult.status}): ${execResult.stderr || execResult.stdout || 'Process crashed'}`,
@@ -1392,8 +1513,8 @@ async function validateFunctionalCorrectness({ code, language, assignment, stdin
 
   // 1. Explicit expectedOutput property on assignment
   if (assignment.expectedOutput) {
-    const expected = assignment.expectedOutput.trim().toLowerCase();
-    if (!actualOut.includes(expected)) {
+    const match = compareOutputs(execResult.stdout, assignment.expectedOutput);
+    if (!match.passed) {
       return {
         passed: false,
         reason: `Output mismatch. Expected output to contain "${assignment.expectedOutput.trim()}", but got: "${execResult.stdout.trim() || '(no output)'}"`,
@@ -1457,12 +1578,18 @@ async function validateFunctionalCorrectness({ code, language, assignment, stdin
   };
 }
 
-// Code Compilation & Execution Endpoint (/api/compile)
-app.post('/api/compile', async (req, res) => {
+// Unified Code Compilation & Execution Handler
+async function handleCompileExecution(req, res) {
   try {
     const { language = 'python', code = '', stdin = '' } = req.body;
     if (!code || !code.trim()) {
-      return res.status(400).json({ error: 'Code content is required for execution' });
+      return res.status(400).json({
+        stdout: '',
+        stderr: 'Code content is required for execution',
+        status: 'Runtime Error',
+        time: '0.00',
+        memory: null
+      });
     }
     const result = await executeCodeInternal({ language, code, stdin });
     res.json(result);
@@ -1475,14 +1602,25 @@ app.post('/api/compile', async (req, res) => {
       memory: null
     });
   }
-});
+}
+
+// Code Compilation & Execution Endpoints (/api/compile and /api/compile/run)
+app.post('/api/compile', handleCompileExecution);
+app.post('/api/compile/run', handleCompileExecution);
 
 // Automated Test Cases Batch Execution Endpoint (/api/compile/testcases)
 app.post('/api/compile/testcases', async (req, res) => {
   try {
     const { language = 'python', code = '', testcases = [] } = req.body;
     if (!code || !code.trim()) {
-      return res.status(400).json({ error: 'Code content is required for execution' });
+      return res.status(400).json({
+        allPassed: false,
+        hasCompileError: false,
+        error: 'Code content is required for execution',
+        total: 0,
+        passedCount: 0,
+        results: []
+      });
     }
 
     const testcasesToRun = Array.isArray(testcases) && testcases.length > 0 
@@ -1495,12 +1633,12 @@ app.post('/api/compile/testcases', async (req, res) => {
     for (let i = 0; i < testcasesToRun.length; i++) {
       const tc = testcasesToRun[i];
       const tcInput = tc.input != null ? String(tc.input) : '';
-      const tcExpected = (tc.expectedOutput != null ? String(tc.expectedOutput) : '').trim();
+      const tcExpected = tc.expectedOutput != null ? String(tc.expectedOutput) : '';
 
       const execResult = await executeCodeInternal({ language, code, stdin: tcInput });
 
-      // If compilation failed, stop immediately and return Compile Error
-      if (execResult.status === 'Compile Error') {
+      // If compilation failed or compiler unavailable, stop immediately and return error
+      if (execResult.status === 'Compile Error' || execResult.status === 'Compiler Unavailable') {
         results.push({
           caseIndex: i + 1,
           input: tcInput,
@@ -1508,12 +1646,13 @@ app.post('/api/compile/testcases', async (req, res) => {
           actualOutput: execResult.stdout,
           stderr: execResult.stderr,
           passed: false,
-          status: 'Compile Error',
+          status: execResult.status,
           time: execResult.time
         });
         return res.json({
           allPassed: false,
-          hasCompileError: true,
+          hasCompileError: execResult.status === 'Compile Error',
+          hasCompilerError: execResult.status === 'Compiler Unavailable',
           compileError: execResult.stderr,
           total: testcasesToRun.length,
           passedCount: 0,
@@ -1521,35 +1660,19 @@ app.post('/api/compile/testcases', async (req, res) => {
         });
       }
 
-      // Check whether actual output matches or contains expected output
-      const actualClean = (execResult.stdout || '').trim();
       let passed = false;
+      let finalStatus = execResult.status;
+
       if (execResult.status === 'Accepted') {
-        if (!tcExpected || tcExpected === '(Any)' || tcExpected.toLowerCase() === 'sample output') {
-          passed = true;
-        } else {
-          const expNorm = tcExpected.toLowerCase();
-          const actNorm = actualClean.toLowerCase();
-          passed = actNorm.includes(expNorm) || actNorm === expNorm;
-          if (!passed) {
-            const normExp = expNorm.replace(/\s+/g, ' ').trim();
-            const normAct = actNorm.replace(/\s+/g, ' ').trim();
-            if (normAct.includes(normExp) || normAct === normExp) {
-              passed = true;
-            }
-          }
-          if (!passed) {
-            // Parity and boolean equivalence
-            if (
-              (expNorm === 'even' && (actNorm.includes('true') || actNorm.includes('even'))) ||
-              (expNorm === 'odd' && (actNorm.includes('false') || actNorm.includes('odd'))) ||
-              (expNorm === 'true' && (actNorm.includes('even') || actNorm.includes('true'))) ||
-              (expNorm === 'false' && (actNorm.includes('odd') || actNorm.includes('false')))
-            ) {
-              passed = true;
-            }
-          }
-        }
+        const comp = compareOutputs(execResult.stdout, tcExpected);
+        passed = comp.passed;
+        finalStatus = passed ? 'Accepted' : 'Wrong Answer';
+      } else if (execResult.status === 'Time Limit Exceeded') {
+        passed = false;
+        finalStatus = 'Time Limit Exceeded';
+      } else {
+        passed = false;
+        finalStatus = 'Runtime Error';
       }
 
       if (passed) passedCount++;
@@ -1561,7 +1684,7 @@ app.post('/api/compile/testcases', async (req, res) => {
         actualOutput: execResult.stdout,
         stderr: execResult.stderr,
         passed,
-        status: execResult.status === 'Runtime Error' ? 'Runtime Error' : (passed ? 'Accepted' : 'Wrong Answer'),
+        status: finalStatus,
         time: execResult.time
       });
     }
@@ -1574,7 +1697,14 @@ app.post('/api/compile/testcases', async (req, res) => {
       results
     });
   } catch (err) {
-    res.status(500).json({ error: 'Testcases execution failed: ' + err.message });
+    res.status(500).json({
+      allPassed: false,
+      hasCompileError: false,
+      error: 'Testcases execution failed: ' + err.message,
+      total: 0,
+      passedCount: 0,
+      results: []
+    });
   }
 });
 

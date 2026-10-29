@@ -197,8 +197,15 @@ export default function CompilerPanel({ initialCode = '', initialLanguage = 'pyt
         })
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Compilation failed');
+      const contentType = res.headers.get('content-type') || '';
+      let data;
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || `Server error (${res.status})`);
+      }
+      if (!res.ok) throw new Error(data.stderr || data.error || 'Compilation failed');
       setOutput(data);
     } catch (err) {
       setOutput({
