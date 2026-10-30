@@ -123,11 +123,13 @@ class Program {
 // ── Status badge helper ─────────────────────────────────────────────────────
 const StatusBadge = ({ status }) => {
   const map = {
-    Accepted:         { cls: 'bg-emerald-950/60 text-emerald-400 border-emerald-800', icon: <CheckCircle className="w-3 h-3" />, label: 'Accepted' },
-    'Wrong Answer':   { cls: 'bg-red-950/60 text-red-400 border-red-800',            icon: <XCircle className="w-3 h-3" />,    label: 'Wrong Answer' },
-    'Runtime Error':  { cls: 'bg-red-950/60 text-red-400 border-red-800',            icon: <XCircle className="w-3 h-3" />,    label: 'Runtime Error' },
-    'Compile Error':  { cls: 'bg-amber-950/60 text-amber-400 border-amber-800',      icon: <XCircle className="w-3 h-3" />,    label: 'Compile Error' },
-    'Time Limit Exceeded': { cls: 'bg-amber-950/60 text-amber-400 border-amber-800', icon: <Clock className="w-3 h-3" />,     label: 'Time Limit Exceeded' },
+    Accepted:               { cls: 'bg-emerald-950/60 text-emerald-400 border-emerald-800', icon: <CheckCircle className="w-3 h-3" />, label: 'Accepted' },
+    'Wrong Answer':         { cls: 'bg-red-950/60 text-red-400 border-red-800',            icon: <XCircle className="w-3 h-3" />,    label: 'Wrong Answer' },
+    'Runtime Error':        { cls: 'bg-red-950/60 text-red-400 border-red-800',            icon: <XCircle className="w-3 h-3" />,    label: 'Runtime Error' },
+    'Compile Error':        { cls: 'bg-amber-950/60 text-amber-400 border-amber-800',      icon: <XCircle className="w-3 h-3" />,    label: 'Compile Error' },
+    'Time Limit Exceeded':  { cls: 'bg-amber-950/60 text-amber-400 border-amber-800',      icon: <Clock className="w-3 h-3" />,     label: 'Time Limit Exceeded' },
+    'Blocked / Not Executed': { cls: 'bg-slate-800 text-slate-400 border-slate-700',      icon: <Square className="w-3 h-3" />,    label: 'Blocked / Not Executed' },
+    'System Error':         { cls: 'bg-purple-950/60 text-purple-400 border-purple-800',    icon: <Terminal className="w-3 h-3" />,  label: 'System Error' },
   };
   const info = map[status] || { cls: 'bg-slate-800 text-slate-400 border-slate-700', icon: <Terminal className="w-3 h-3" />, label: status };
   return (

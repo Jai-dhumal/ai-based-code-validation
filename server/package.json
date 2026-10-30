@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "test": "node test_integration.js && node test_e2e_api.js && node test_security_otp.js && node test_comprehensive_audit.js && node test_forgot_password.js && node test_assignment_data_flow.js && node test_execution_pipeline.js",
+    "test:scenarios": "node test_all_scenarios_runner.js",
     "test:pipeline": "node test_execution_pipeline.js",
     "test:unit": "node test_integration.js",
     "test:e2e": "node test_e2e_api.js",
