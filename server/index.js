@@ -1113,6 +1113,52 @@ app.post('/api/auth/google', async (req, res) => {
   }
 });
 
+// Helper: Auto-provision JDK on Linux cloud hosts (Render) if not present
+let isProvisioningJdk = false;
+async function ensureJdkProvisioned() {
+  if (os.platform() === 'win32') return; // Windows uses preinstalled JDK
+  const currentJavac = getJavacCommand();
+  if (currentJavac !== 'javac' || fs.existsSync('/usr/bin/javac') || fs.existsSync('/usr/lib/jvm/default-java/bin/javac')) {
+    return; // Already present
+  }
+  // Check if already in ~/.jdk
+  const homeJdk = path.join(os.homedir(), '.jdk', 'jdk-17');
+  if (fs.existsSync(path.join(homeJdk, 'bin', 'javac'))) {
+    return;
+  }
+  if (isProvisioningJdk) return;
+  isProvisioningJdk = true;
+
+  try {
+    console.log('📦 [JDK PROVISIONER] Javac not detected. Auto-provisioning Eclipse Temurin OpenJDK 17 LTS...');
+    const tmpTar = path.join(os.tmpdir(), `openjdk17_${Date.now()}.tar.gz`);
+    fs.mkdirSync(homeJdk, { recursive: true });
+
+    // Download with curl or node
+    const curlRes = spawnSync('curl', ['-sSL', '-o', tmpTar, 'https://api.adoptium.net/v3/binary/latest/17/ga/linux/x64/jdk/hotspot/normal/eclipse'], { timeout: 120000 });
+    if (curlRes.status === 0 && fs.existsSync(tmpTar)) {
+      const tarRes = spawnSync('tar', ['-xzf', tmpTar, '-C', homeJdk, '--strip-components=1'], { timeout: 60000 });
+      try { fs.unlinkSync(tmpTar); } catch (e) {}
+      if (tarRes.status === 0) {
+        console.log('✅ [JDK PROVISIONER] OpenJDK 17 successfully installed to', homeJdk);
+        process.env.JAVA_HOME = homeJdk;
+        process.env.PATH = `${path.join(homeJdk, 'bin')}:${process.env.PATH || ''}`;
+      } else {
+        console.error('❌ [JDK PROVISIONER] Tar extraction failed:', tarRes.stderr?.toString());
+      }
+    } else {
+      console.error('❌ [JDK PROVISIONER] Curl download failed:', curlRes.stderr?.toString());
+    }
+  } catch (err) {
+    console.error('❌ [JDK PROVISIONER] Error provisioning JDK:', err.message);
+  } finally {
+    isProvisioningJdk = false;
+  }
+}
+
+// Background check on server initialization
+ensureJdkProvisioned().catch(() => {});
+
 // Helper: Resolve working Python interpreter
 function getPythonCommand() {
   const customWin = path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python', 'Python312', 'python.exe');
@@ -1122,6 +1168,96 @@ function getPythonCommand() {
   const customProg = path.join(process.env.ProgramFiles || '', 'Python312', 'python.exe');
   if (fs.existsSync(customProg)) return customProg;
   return 'python';
+}
+
+// Helper: Resolve working Java / JDK paths across OS platforms and cloud environments
+function getJavaCommand() {
+  if (process.env.JAVA_HOME) {
+    const bin = path.join(process.env.JAVA_HOME, 'bin', os.platform() === 'win32' ? 'java.exe' : 'java');
+    if (fs.existsSync(bin)) return bin;
+  }
+  const homeJdk = path.join(os.homedir(), '.jdk');
+  if (fs.existsSync(homeJdk)) {
+    try {
+      const entries = fs.readdirSync(homeJdk);
+      for (const entry of entries) {
+        const bin = path.join(homeJdk, entry, 'bin', os.platform() === 'win32' ? 'java.exe' : 'java');
+        if (fs.existsSync(bin)) return bin;
+      }
+    } catch (e) {}
+  }
+  if (os.platform() === 'win32') {
+    const pfJava = 'C:\\Program Files\\Java';
+    if (fs.existsSync(pfJava)) {
+      try {
+        const jdks = fs.readdirSync(pfJava).filter(d => d.startsWith('jdk') || d === 'latest').sort().reverse();
+        for (const jdk of jdks) {
+          const bin = path.join(pfJava, jdk, 'bin', 'java.exe');
+          if (fs.existsSync(bin)) return bin;
+        }
+      } catch (e) {}
+    }
+  }
+  return 'java';
+}
+
+function getJavacCommand() {
+  if (process.env.JAVA_HOME) {
+    const bin = path.join(process.env.JAVA_HOME, 'bin', os.platform() === 'win32' ? 'javac.exe' : 'javac');
+    if (fs.existsSync(bin)) return bin;
+  }
+  const homeJdk = path.join(os.homedir(), '.jdk');
+  if (fs.existsSync(homeJdk)) {
+    try {
+      const entries = fs.readdirSync(homeJdk);
+      for (const entry of entries) {
+        const bin = path.join(homeJdk, entry, 'bin', os.platform() === 'win32' ? 'javac.exe' : 'javac');
+        if (fs.existsSync(bin)) return bin;
+      }
+    } catch (e) {}
+  }
+  if (os.platform() === 'win32') {
+    const pfJava = 'C:\\Program Files\\Java';
+    if (fs.existsSync(pfJava)) {
+      try {
+        const jdks = fs.readdirSync(pfJava).filter(d => d.startsWith('jdk') || d === 'latest').sort().reverse();
+        for (const jdk of jdks) {
+          const bin = path.join(pfJava, jdk, 'bin', 'javac.exe');
+          if (fs.existsSync(bin)) return bin;
+        }
+      } catch (e) {}
+    }
+  }
+  return 'javac';
+}
+
+// Helper: Resolve working C/C++ compilers across OS platforms
+function getCCompilerCommand() {
+  if (os.platform() === 'win32') {
+    const candidates = [
+      'C:\\MinGW\\bin\\gcc.exe',
+      'C:\\TDM-GCC-64\\bin\\gcc.exe',
+      path.join(process.env.ProgramFiles || '', 'Git', 'usr', 'bin', 'gcc.exe')
+    ];
+    for (const c of candidates) {
+      if (fs.existsSync(c)) return c;
+    }
+  }
+  return 'gcc';
+}
+
+function getCppCompilerCommand() {
+  if (os.platform() === 'win32') {
+    const candidates = [
+      'C:\\MinGW\\bin\\g++.exe',
+      'C:\\TDM-GCC-64\\bin\\g++.exe',
+      path.join(process.env.ProgramFiles || '', 'Git', 'usr', 'bin', 'g++.exe')
+    ];
+    for (const c of candidates) {
+      if (fs.existsSync(c)) return c;
+    }
+  }
+  return 'g++';
 }
 
 // Reusable output normalization and comparison helpers
@@ -1227,7 +1363,7 @@ export function compareOutputs(actualRaw, expectedRaw) {
 }
 
 // Reusable program compiler & executor
-async function executeCodeInternal({ language = 'python', code = '', stdin = '' }) {
+export async function executeCodeInternal({ language = 'python', code = '', stdin = '' }) {
   const startTime = Date.now();
   let srcFile = null;
   let exeFile = null;
@@ -1265,7 +1401,7 @@ async function executeCodeInternal({ language = 'python', code = '', stdin = '' 
       srcFile = path.join(tmpDir, `${tmpId}.cpp`);
       exeFile = os.platform() === 'win32' ? path.join(tmpDir, `${tmpId}.exe`) : path.join(tmpDir, tmpId);
       fs.writeFileSync(srcFile, runnableCode, 'utf8');
-      compileCmd = 'g++';
+      compileCmd = getCppCompilerCommand();
       compileArgs = [srcFile, '-O2', '-o', exeFile];
       runCmd = exeFile;
       runArgs = [];
@@ -1273,19 +1409,23 @@ async function executeCodeInternal({ language = 'python', code = '', stdin = '' 
       srcFile = path.join(tmpDir, `${tmpId}.c`);
       exeFile = os.platform() === 'win32' ? path.join(tmpDir, `${tmpId}.exe`) : path.join(tmpDir, tmpId);
       fs.writeFileSync(srcFile, runnableCode, 'utf8');
-      compileCmd = 'gcc';
+      compileCmd = getCCompilerCommand();
       compileArgs = [srcFile, '-O2', '-o', exeFile];
       runCmd = exeFile;
       runArgs = [];
     } else if (lang === 'java') {
+      // If javac is missing on Linux, trigger synchronous provision attempt
+      if (os.platform() !== 'win32' && getJavacCommand() === 'javac') {
+        await ensureJdkProvisioned();
+      }
       const className = prepared.className || 'Solution';
       javaDir = path.join(tmpDir, tmpId);
       fs.mkdirSync(javaDir, { recursive: true });
       srcFile = path.join(javaDir, `${className}.java`);
       fs.writeFileSync(srcFile, runnableCode, 'utf8');
-      compileCmd = 'javac';
+      compileCmd = getJavacCommand();
       compileArgs = [srcFile];
-      runCmd = 'java';
+      runCmd = getJavaCommand();
       runArgs = ['-cp', javaDir, className];
     } else {
       return {

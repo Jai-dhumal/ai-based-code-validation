@@ -8,6 +8,7 @@
     "dev": "node dev-runner.js",
     "start": "node server/index.js",
     "test": "npm test --prefix server",
+    "build:render": "bash render-build.sh",
     "build": "npm install --include=dev --prefix server && npm install --include=dev --prefix client && npm run build --prefix client",
     "install:all": "npm install --include=dev && npm install --include=dev --prefix server && npm install --include=dev --prefix client"
   },
