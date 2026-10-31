@@ -654,17 +654,32 @@ class Database {
     const sanitizedExamples = rawExamples.map(ex => ({
       input: typeof ex.input === 'string' ? ex.input : String(ex.input ?? ''),
       expectedOutput: typeof ex.expectedOutput === 'string' ? ex.expectedOutput : String(ex.expectedOutput ?? ''),
-      explanation: typeof ex.explanation === 'string' ? ex.explanation : String(ex.explanation ?? '')
+      explanation: typeof ex.explanation === 'string' ? ex.explanation : String(ex.explanation ?? ''),
+      category: ex.category || 'public'
+    }));
+    const rawHidden = Array.isArray(asg.hiddenTestcases) ? asg.hiddenTestcases : [];
+    const sanitizedHidden = rawHidden.map(ex => ({
+      input: typeof ex.input === 'string' ? ex.input : String(ex.input ?? ''),
+      expectedOutput: typeof ex.expectedOutput === 'string' ? ex.expectedOutput : String(ex.expectedOutput ?? ''),
+      explanation: typeof ex.explanation === 'string' ? ex.explanation : String(ex.explanation ?? ''),
+      category: ex.category || 'hidden'
     }));
 
     const sanitizedAsg = {
       ...asg,
+      executionMode: asg.executionMode || 'full_program',
+      functionConfig: asg.functionConfig || null,
+      difficulty: asg.difficulty || 'Medium',
       problemStatement: asg.problemStatement || asg.description || '',
       inputFormat: asg.inputFormat || '',
       outputFormat: asg.outputFormat || '',
       constraints: asg.constraints || '',
       examples: sanitizedExamples,
-      testcases: sanitizedExamples
+      testcases: sanitizedExamples,
+      hiddenTestcases: sanitizedHidden,
+      quizQuestions: Array.isArray(asg.quizQuestions) ? asg.quizQuestions : [],
+      referenceSolution: asg.referenceSolution || {},
+      isAiGenerated: Boolean(asg.isAiGenerated)
     };
 
     this.data.assignments.push(sanitizedAsg);

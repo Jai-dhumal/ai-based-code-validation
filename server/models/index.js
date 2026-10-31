@@ -68,6 +68,24 @@ export const AssignmentSchema = new mongoose.Schema({
     explanation: { type: String, default: '' }
   }],
   starterCode: { type: mongoose.Schema.Types.Mixed, default: {} },
+  executionMode: { type: String, enum: ['function', 'full_program'], default: 'full_program' },
+  functionConfig: { type: mongoose.Schema.Types.Mixed, default: null },
+  hiddenTestcases: [{
+    input: { type: String, default: '' },
+    expectedOutput: { type: String, default: '' },
+    explanation: { type: String, default: '' },
+    category: { type: String, default: 'hidden' }
+  }],
+  quizQuestions: [{
+    question: { type: String, default: '' },
+    options: [{ type: String }],
+    correctAnswer: { type: Number, default: 0 },
+    explanation: { type: String, default: '' },
+    difficulty: { type: String, default: 'Medium' }
+  }],
+  referenceSolution: { type: mongoose.Schema.Types.Mixed, default: {} },
+  difficulty: { type: String, default: 'Medium' },
+  isAiGenerated: { type: Boolean, default: false },
   department: { type: String, default: 'Computer Engineering', index: true },
   division: { type: String, default: 'all', index: true },
   divisions: [{ type: String }]

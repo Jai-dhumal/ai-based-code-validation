@@ -17,6 +17,8 @@ import { tokenizeCode } from './plagiarism/tokenizer.js';
 import { runTier2Evaluation, generateCodeQuiz, generateAssignmentTestcases } from './services/gemini.js';
 import { generateSubmissionReceipt } from './services/github.js';
 import { prepareRunnableCode } from './services/codeHarness.js';
+import { wrapCodeWithDriver, stripExecutionDriver } from './services/executionDriver.js';
+import { analyzeAndGenerateAssignment, verifyTestcasesIndependently } from './services/assignmentGenerator.js';
 import nodemailer from 'nodemailer';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1312,11 +1314,9 @@ export function compareOutputs(actualRaw, expectedRaw) {
     return { passed: true, reason: 'Whitespace-collapsed match' };
   }
 
-  // 5. Clean array / list representation matching
-  // Only applies if the expected output is a list of numbers or comma/space-separated values,
-  // and the actual output is the exact same values formatted with standard list punctuation (e.g. "[10, 20, 30]" vs "10 20 30" or "10 -> 20 -> 30 -> NULL")
-  // NOTE: Strictly requires identical token count and tokens; does not allow extra words or missing numbers.
-  const expTokens = expectedTrim.split(/[\s,]+/).filter(Boolean);
+  // 5. Clean array / list representation matching (e.g. "[0, 1]" vs "[0,1]" vs "0 1")
+  const expCleanPunct = expectedTrim.replace(/->|NULL|null|[\[\](),]/g, ' ').trim();
+  const expTokens = expCleanPunct.split(/\s+/).filter(Boolean);
   const actCleanPunct = actualTrim.replace(/->|NULL|null|[\[\](),]/g, ' ').trim();
   const actTokens = actCleanPunct.split(/\s+/).filter(Boolean);
 
@@ -1563,6 +1563,15 @@ export async function executeCodeInternal({ language = 'python', code = '', stdi
 
 // Functional correctness and output verification helper
 async function validateFunctionalCorrectness({ code, language, assignment, stdin = '' }) {
+  let executableCode = code;
+  if (assignment && assignment.executionMode === 'function' && assignment.functionConfig) {
+    executableCode = wrapCodeWithDriver({
+      language,
+      code,
+      functionConfig: assignment.functionConfig
+    });
+  }
+
   // If assignment has testcases configured (LeetCode style)
   if (assignment && Array.isArray(assignment.testcases) && assignment.testcases.length > 0) {
     for (let i = 0; i < assignment.testcases.length; i++) {
@@ -1570,7 +1579,7 @@ async function validateFunctionalCorrectness({ code, language, assignment, stdin
       const tcInput = tc.input != null ? String(tc.input) : '';
       const tcExpected = tc.expectedOutput != null ? String(tc.expectedOutput) : '';
 
-      const tcExec = await executeCodeInternal({ language, code, stdin: tcInput });
+      const tcExec = await executeCodeInternal({ language, code: executableCode, stdin: tcInput });
       if (tcExec.status === 'Compile Error' || tcExec.status === 'Compiler Unavailable' || tcExec.status === 'Runtime Error') {
         return {
           passed: false,
@@ -1686,7 +1695,15 @@ async function validateFunctionalCorrectness({ code, language, assignment, stdin
 // Unified Code Compilation & Execution Handler
 async function handleCompileExecution(req, res) {
   try {
-    const { language = 'python', code = '', stdin = '' } = req.body;
+    const { 
+      language = 'python', 
+      code = '', 
+      stdin = '',
+      assignmentId = null,
+      executionMode = null,
+      functionConfig = null
+    } = req.body;
+
     if (!code || !code.trim()) {
       return res.status(400).json({
         stdout: '',
@@ -1696,7 +1713,24 @@ async function handleCompileExecution(req, res) {
         memory: null
       });
     }
-    const result = await executeCodeInternal({ language, code, stdin });
+
+    let codeToRun = code;
+    let targetMode = executionMode;
+    let targetConfig = functionConfig;
+
+    if (assignmentId) {
+      const asg = db.getAssignmentById(assignmentId);
+      if (asg) {
+        if (!targetMode) targetMode = asg.executionMode;
+        if (!targetConfig) targetConfig = asg.functionConfig;
+      }
+    }
+
+    if (targetMode === 'function' && targetConfig) {
+      codeToRun = wrapCodeWithDriver({ language, code, functionConfig: targetConfig });
+    }
+
+    const result = await executeCodeInternal({ language, code: codeToRun, stdin });
     res.json(result);
   } catch (err) {
     res.status(500).json({
@@ -1994,8 +2028,32 @@ export async function executeBatchTestcasesInternal({ language = 'python', code 
 // Automated Test Cases Batch Execution Endpoint (/api/compile/testcases)
 app.post('/api/compile/testcases', async (req, res) => {
   try {
-    const { language = 'python', code = '', testcases = [] } = req.body;
-    const batchResult = await executeBatchTestcasesInternal({ language, code, testcases });
+    const { 
+      language = 'python', 
+      code = '', 
+      testcases = [],
+      assignmentId = null,
+      executionMode = null,
+      functionConfig = null
+    } = req.body;
+
+    let codeToRun = code;
+    let targetMode = executionMode;
+    let targetConfig = functionConfig;
+
+    if (assignmentId) {
+      const asg = db.getAssignmentById(assignmentId);
+      if (asg) {
+        if (!targetMode) targetMode = asg.executionMode;
+        if (!targetConfig) targetConfig = asg.functionConfig;
+      }
+    }
+
+    if (targetMode === 'function' && targetConfig) {
+      codeToRun = wrapCodeWithDriver({ language, code, functionConfig: targetConfig });
+    }
+
+    const batchResult = await executeBatchTestcasesInternal({ language, code: codeToRun, testcases });
     res.json(batchResult);
   } catch (err) {
     res.status(500).json({
@@ -2478,6 +2536,13 @@ app.post('/api/assignments', authenticate, authorize('teacher', 'admin'), (req, 
       starterCode, 
       testcases,
       examples,
+      hiddenTestcases,
+      quizQuestions,
+      functionConfig,
+      executionMode,
+      difficulty,
+      referenceSolution,
+      isAiGenerated,
       expectedOutput,
       department,
       division,
@@ -2492,7 +2557,16 @@ app.post('/api/assignments', authenticate, authorize('teacher', 'admin'), (req, 
     const sanitizedExamples = rawExamples.map(ex => ({
       input: typeof ex.input === 'string' ? ex.input : String(ex.input ?? ''),
       expectedOutput: typeof ex.expectedOutput === 'string' ? ex.expectedOutput : String(ex.expectedOutput ?? ''),
-      explanation: typeof ex.explanation === 'string' ? ex.explanation : String(ex.explanation ?? '')
+      explanation: typeof ex.explanation === 'string' ? ex.explanation : String(ex.explanation ?? ''),
+      category: ex.category || 'public'
+    }));
+
+    const rawHidden = Array.isArray(hiddenTestcases) ? hiddenTestcases : [];
+    const sanitizedHidden = rawHidden.map(ex => ({
+      input: typeof ex.input === 'string' ? ex.input : String(ex.input ?? ''),
+      expectedOutput: typeof ex.expectedOutput === 'string' ? ex.expectedOutput : String(ex.expectedOutput ?? ''),
+      explanation: typeof ex.explanation === 'string' ? ex.explanation : String(ex.explanation ?? ''),
+      category: ex.category || 'hidden'
     }));
 
     const targetDivision = division || 'all';
@@ -2506,15 +2580,22 @@ app.post('/api/assignments', authenticate, authorize('teacher', 'admin'), (req, 
       subject: subject || 'Computer Science',
       code: code || `CS${Math.floor(100 + Math.random() * 900)}`,
       deadline: deadline || new Date(Date.now() + 14 * 86400000).toISOString(),
-      languages: Array.isArray(languages) && languages.length > 0 ? languages : ['python'],
+      languages: Array.isArray(languages) && languages.length > 0 ? languages : ['python', 'cpp', 'c', 'java', 'javascript'],
       minQuizScore: Number(minQuizScore) || 70,
       description: description || problemStatement || '',
       problemStatement: problemStatement || description || '',
       inputFormat: inputFormat || '',
       outputFormat: outputFormat || '',
       constraints: constraints || '',
+      executionMode: executionMode || (functionConfig ? 'function' : 'full_program'),
+      functionConfig: functionConfig || null,
+      difficulty: difficulty || 'Medium',
       examples: sanitizedExamples,
       testcases: sanitizedExamples,
+      hiddenTestcases: sanitizedHidden,
+      quizQuestions: Array.isArray(quizQuestions) ? quizQuestions : [],
+      referenceSolution: referenceSolution || {},
+      isAiGenerated: Boolean(isAiGenerated),
       expectedOutput: expectedOutput || '',
       starterCode: starterCode || { python: '# Write your solution here\n' },
       department: department || req.user.department || 'Computer Engineering',
@@ -2530,7 +2611,51 @@ app.post('/api/assignments', authenticate, authorize('teacher', 'admin'), (req, 
   }
 });
 
-// AI Generate Testcases (LeetCode style)
+// AI Analyze & Generate Assignment (Autonomous LeetCode style generation with Independent Verification)
+app.post('/api/assignments/ai-analyze', authenticate, authorize('teacher', 'admin'), async (req, res) => {
+  try {
+    const { title = '', problemStatement = '', languages, difficulty } = req.body;
+    if (!problemStatement || !problemStatement.trim()) {
+      return res.status(400).json({ error: 'Problem statement is required for AI assignment generation' });
+    }
+
+    const settings = db.getSettings();
+    const apiKey = settings.geminiApiKey || process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(503).json({ error: 'Gemini API key is not configured. Please add an API key in Settings.' });
+    }
+
+    const generated = await analyzeAndGenerateAssignment({
+      title,
+      problemStatement,
+      languages: Array.isArray(languages) && languages.length > 0 ? languages : ['python', 'javascript', 'cpp', 'c', 'java'],
+      difficulty: difficulty || 'Medium',
+      apiKey
+    });
+
+    res.json(generated);
+  } catch (err) {
+    console.error('AI assignment generation failed:', err);
+    res.status(500).json({ error: 'AI assignment generation failed: ' + err.message });
+  }
+});
+
+// Independent Test Case Verification Endpoint
+app.post('/api/assignments/verify-testcases', authenticate, authorize('teacher', 'admin'), async (req, res) => {
+  try {
+    const { functionConfig, referenceSolutionPython, candidateTestcases } = req.body;
+    const result = await verifyTestcasesIndependently({
+      functionConfig,
+      referenceSolutionPython,
+      candidateTestcases
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'Verification failed: ' + err.message });
+  }
+});
+
+// AI Generate Testcases (LeetCode style legacy fallback)
 app.post('/api/assignments/generate-testcases', authenticate, async (req, res) => {
   try {
     const { title = '', description = '', language = 'cpp' } = req.body;
@@ -2665,8 +2790,13 @@ app.post('/api/validate/tier1', authenticate, async (req, res) => {
       }
     }
 
-    // Step 2: Plagiarism Winnowing Check with strict 70% high threshold
-    const plagResult = runTier1Check(code, combinedComparisonPool, {
+    // Step 2: Plagiarism Winnowing Check using clean student-authored code (excluding wrappers)
+    const studentAuthoredCode = stripExecutionDriver(code);
+    const cleanComparisonPool = combinedComparisonPool.map(item => ({
+      ...item,
+      code: stripExecutionDriver(item.code)
+    }));
+    const plagResult = runTier1Check(studentAuthoredCode, cleanComparisonPool, {
       lowThreshold: settings.tier1ThresholdLow !== undefined ? settings.tier1ThresholdLow : 30,
       highThreshold: settings.tier1ThresholdHigh !== undefined ? settings.tier1ThresholdHigh : 70
     });
@@ -2743,13 +2873,24 @@ app.post('/api/quiz/generate', authenticate, async (req, res) => {
     const settings = db.getSettings();
     const apiKey = settings.geminiApiKey || process.env.GEMINI_API_KEY;
 
-    const questions = await generateCodeQuiz({
-      code,
-      assignmentTitle: assignment ? assignment.title : 'Data Structures',
-      language: language || (assignment && assignment.languages ? assignment.languages[0] : 'python'),
-      apiKey,
-      attempt: Number(attempt) || 1
-    });
+    let questions;
+    if (assignment && Array.isArray(assignment.quizQuestions) && assignment.quizQuestions.length >= 3) {
+      questions = assignment.quizQuestions.map((q, idx) => ({
+        id: idx + 1,
+        question: q.question,
+        options: q.options,
+        correctAnswer: q.correctAnswer !== undefined ? q.correctAnswer : 0,
+        explanation: q.explanation || ''
+      }));
+    } else {
+      questions = await generateCodeQuiz({
+        code: stripExecutionDriver(code),
+        assignmentTitle: assignment ? assignment.title : 'Data Structures',
+        language: language || (assignment && assignment.languages ? assignment.languages[0] : 'python'),
+        apiKey,
+        attempt: Number(attempt) || 1
+      });
+    }
 
     // Strip answers from client payload
     const sanitizedQuestions = questions.map((q, idx) => ({

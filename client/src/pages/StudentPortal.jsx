@@ -741,7 +741,10 @@ export default function StudentPortal({
           body: JSON.stringify({
             language: selectedLanguage,
             code,
-            stdin: activeStdin
+            stdin: activeStdin,
+            assignmentId: activeAssignment?.id || selectedAssignment?.id,
+            executionMode: activeAssignment?.executionMode || selectedAssignment?.executionMode,
+            functionConfig: activeAssignment?.functionConfig || selectedAssignment?.functionConfig
           })
         });
 
@@ -801,7 +804,10 @@ export default function StudentPortal({
           body: JSON.stringify({
             language: selectedLanguage,
             code,
-            testcases: [targetCase]
+            testcases: [targetCase],
+            assignmentId: activeAssignment?.id || selectedAssignment?.id,
+            executionMode: activeAssignment?.executionMode || selectedAssignment?.executionMode,
+            functionConfig: activeAssignment?.functionConfig || selectedAssignment?.functionConfig
           })
         });
 
@@ -872,7 +878,10 @@ export default function StudentPortal({
           body: JSON.stringify({
             language: selectedLanguage,
             code,
-            stdin: stdinInput || ''
+            stdin: stdinInput || '',
+            assignmentId: activeAssignment?.id || selectedAssignment?.id,
+            executionMode: activeAssignment?.executionMode || selectedAssignment?.executionMode,
+            functionConfig: activeAssignment?.functionConfig || selectedAssignment?.functionConfig
           })
         });
         const contentType = res.headers.get('content-type') || '';
@@ -906,7 +915,10 @@ export default function StudentPortal({
         body: JSON.stringify({
           language: selectedLanguage,
           code,
-          testcases
+          testcases,
+          assignmentId: activeAssignment?.id || selectedAssignment?.id,
+          executionMode: activeAssignment?.executionMode || selectedAssignment?.executionMode,
+          functionConfig: activeAssignment?.functionConfig || selectedAssignment?.functionConfig
         })
       });
 
@@ -962,8 +974,10 @@ export default function StudentPortal({
     setShowConsole(true);
     setConsoleTab('results');
 
-    const testcases = getTestCases();
-    const casesToRun = testcases.length > 0 ? testcases : [{ input: '', expectedOutput: '(Any)' }];
+    const publicCases = getTestCases();
+    const hiddenCases = Array.isArray(activeAssignment?.hiddenTestcases) ? activeAssignment.hiddenTestcases : [];
+    const allCasesToRun = [...publicCases, ...hiddenCases];
+    const casesToRun = allCasesToRun.length > 0 ? allCasesToRun : [{ input: '', expectedOutput: '(Any)' }];
 
     try {
       const res = await fetch('/api/compile/testcases', {
@@ -972,7 +986,10 @@ export default function StudentPortal({
         body: JSON.stringify({
           language: selectedLanguage,
           code,
-          testcases: casesToRun
+          testcases: casesToRun,
+          assignmentId: activeAssignment?.id || selectedAssignment?.id,
+          executionMode: activeAssignment?.executionMode || selectedAssignment?.executionMode,
+          functionConfig: activeAssignment?.functionConfig || selectedAssignment?.functionConfig
         })
       });
 
@@ -1575,6 +1592,22 @@ export default function StudentPortal({
               <div className="mt-1 text-xs text-slate-600 dark:text-slate-400">
                 <span className="font-bold text-slate-700 dark:text-slate-300">Constraints: </span>
                 <span className="font-mono text-[11px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-700 dark:text-slate-300">{activeAssignment.constraints}</span>
+              </div>
+            )}
+
+            {activeAssignment.executionMode === 'function' && activeAssignment.functionConfig && (
+              <div className="mt-2.5 p-2.5 bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/60 rounded-xl text-xs flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 rounded-md bg-indigo-600 text-white font-mono text-[10px] font-bold">
+                    ⚡ Function-Based
+                  </span>
+                  <span className="font-mono text-slate-800 dark:text-slate-200">
+                    <strong className="text-indigo-600 dark:text-indigo-400">{activeAssignment.functionConfig.returnType || 'void'}</strong> {activeAssignment.functionConfig.functionName}(
+                    {(activeAssignment.functionConfig.parameters || []).map(p => `${p.type} ${p.name}`).join(', ')}
+                    )
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 hidden md:inline">Driver automatically handles I/O</span>
               </div>
             )}
           </div>

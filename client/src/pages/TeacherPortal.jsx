@@ -88,6 +88,30 @@ export default function TeacherPortal({
   const [isGeneratingAiTestcases, setIsGeneratingAiTestcases] = useState(false);
   const [isSubmittingAsg, setIsSubmittingAsg] = useState(false);
 
+  // AI-Powered Automatic Assignment Creation & Review State
+  const [creationStep, setCreationStep] = useState('input'); // 'input' | 'review'
+  const [creationMode, setCreationMode] = useState('function'); // 'function' | 'full_program'
+  const [difficulty, setDifficulty] = useState('Medium');
+  const [selectedLanguages, setSelectedLanguages] = useState(['python', 'javascript', 'cpp', 'c', 'java']);
+  const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
+  const [aiAnalysisError, setAiAnalysisError] = useState(null);
+
+  // Review & Approval State
+  const [reviewTab, setReviewTab] = useState('specs'); // 'specs' | 'function' | 'templates' | 'testcases' | 'quiz'
+  const [previewLanguage, setPreviewLanguage] = useState('python');
+  const [functionConfig, setFunctionConfig] = useState({
+    functionName: '',
+    className: 'Solution',
+    returnType: 'int',
+    parameters: []
+  });
+  const [starterTemplates, setStarterTemplates] = useState({});
+  const [hiddenCases, setHiddenCases] = useState([]);
+  const [quizQuestions, setQuizQuestions] = useState([]);
+  const [referenceSolutionPython, setReferenceSolutionPython] = useState('');
+  const [verificationReport, setVerificationReport] = useState(null);
+  const [isReVerifying, setIsReVerifying] = useState(false);
+
   // ==========================================
   // TAB 3: QUIZ PERMISSIONS STATE
   // ==========================================
@@ -531,9 +555,92 @@ export default function TeacherPortal({
     }
   };
 
-  // Handle assignment creation
+  // Handle AI Full Assignment Analysis & Verification
+  const handleAiGenerateFullAssignment = async () => {
+    if (!title.trim() || !desc.trim()) {
+      alert('Please enter an Assignment Title and Problem Statement first.');
+      return;
+    }
+    setIsAiAnalyzing(true);
+    setAiAnalysisError(null);
+
+    try {
+      const res = await fetch('/api/assignments/ai-analyze', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          title: title.trim(),
+          problemStatement: desc.trim(),
+          languages: selectedLanguages,
+          difficulty
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to analyze assignment');
+      }
+
+      if (data.functionConfig) setFunctionConfig(data.functionConfig);
+      if (data.starterCode) setStarterTemplates(data.starterCode);
+      if (data.constraints) setConstraints(data.constraints);
+      if (data.inputRequirements) setInputFormat(data.inputRequirements);
+      if (data.expectedOutputRequirements) setOutputFormat(data.expectedOutputRequirements);
+      if (data.referenceSolutionPython) setReferenceSolutionPython(data.referenceSolutionPython);
+      if (data.verification) setVerificationReport(data.verification);
+
+      const rawTests = Array.isArray(data.verifiedTestcases) ? data.verifiedTestcases : (data.candidateTestcases || []);
+      const pubCases = rawTests.filter(tc => tc.category !== 'hidden');
+      const hidCases = rawTests.filter(tc => tc.category === 'hidden');
+
+      setTestcases(pubCases.length > 0 ? pubCases : rawTests.slice(0, 3));
+      setHiddenCases(hidCases.length > 0 ? hidCases : rawTests.slice(3));
+
+      if (Array.isArray(data.quizQuestions) && data.quizQuestions.length > 0) {
+        setQuizQuestions(data.quizQuestions);
+      }
+
+      setCreationMode(data.executionMode || 'function');
+      setCreationStep('review');
+      setReviewTab('specs');
+    } catch (err) {
+      console.error('AI Analysis error:', err);
+      setAiAnalysisError(err.message);
+    } finally {
+      setIsAiAnalyzing(false);
+    }
+  };
+
+  // Re-verify test cases against reference solution
+  const handleReVerifyTestcases = async () => {
+    setIsReVerifying(true);
+    try {
+      const allCandidate = [...testcases, ...hiddenCases];
+      const res = await fetch('/api/assignments/verify-testcases', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          functionConfig,
+          referenceSolutionPython,
+          candidateTestcases: allCandidate
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.verifiedTestcases) {
+        setTestcases(data.verifiedTestcases.filter(tc => tc.category !== 'hidden'));
+        setHiddenCases(data.verifiedTestcases.filter(tc => tc.category === 'hidden'));
+        setVerificationReport(data);
+      }
+    } catch (err) {
+      alert('Verification error: ' + err.message);
+    } finally {
+      setIsReVerifying(false);
+    }
+  };
+
+  // Handle assignment creation / approval & publish
   const handleCreateAssignment = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     setIsSubmittingAsg(true);
     try {
       const res = await fetch('/api/assignments', {
@@ -553,21 +660,29 @@ export default function TeacherPortal({
           department: targetDepartment || currentUser?.department || 'Computer Engineering',
           division: targetDivision,
           divisions: targetDivision === 'all' ? ['A', 'B', 'C'] : [targetDivision],
-          languages: ['python', 'cpp', 'c', 'java', 'javascript'],
+          languages: selectedLanguages,
+          executionMode: creationMode,
+          functionConfig: creationMode === 'function' ? functionConfig : null,
+          difficulty,
           testcases: testcases || [],
           examples: testcases || [],
-          starterCode: {
+          hiddenTestcases: hiddenCases || [],
+          quizQuestions: quizQuestions || [],
+          referenceSolution: { python: referenceSolutionPython },
+          starterCode: Object.keys(starterTemplates).length > 0 ? starterTemplates : {
             python: '# Python Solution\nprint("Hello World")\n',
             cpp: '// C++ Solution\n#include <iostream>\nusing namespace std;\n\nint main() {\n    return 0;\n}\n',
             c: '// C Solution\n#include <stdio.h>\n\nint main() {\n    return 0;\n}\n',
             java: '// Java Solution\npublic class Solution {\n    public static void main(String[] args) {\n    }\n}\n',
             javascript: '// JavaScript Solution\nconsole.log("Hello World");\n'
-          }
+          },
+          isAiGenerated: creationStep === 'review'
         })
       });
 
       if (res.ok) {
         setIsCreateModalOpen(false);
+        setCreationStep('input');
         if (onRefreshData) onRefreshData();
         setTitle('');
         setDesc('');
@@ -575,6 +690,9 @@ export default function TeacherPortal({
         setOutputFormat('');
         setConstraints('');
         setTestcases([]);
+        setHiddenCases([]);
+        setQuizQuestions([]);
+        setStarterTemplates({});
         setTargetDivision('all');
       } else {
         const err = await res.json();
@@ -2418,235 +2536,800 @@ export default function TeacherPortal({
         </div>
       )}
 
-      {/* 2. Create Assignment Modal */}
+      {/* 2. AI-Powered Create Assignment Modal & Review Interface */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl max-w-lg w-full p-6 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in overflow-y-auto">
+          <div className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full p-6 space-y-4 my-8 transition-all ${creationStep === 'review' ? 'max-w-4xl' : 'max-w-2xl'}`}>
+            
+            {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <h4 className="font-extrabold text-base text-slate-900 dark:text-white">
-                Create New Programming Assignment
-              </h4>
+              <div>
+                <h4 className="font-extrabold text-base text-slate-900 dark:text-white flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                  <span>{creationStep === 'review' ? 'Review & Approve AI-Generated Assignment' : 'Create New Programming Assignment'}</span>
+                </h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  {creationStep === 'review' 
+                    ? 'Review the extracted function signatures, verified test cases, starter code, and quiz questions before publishing.' 
+                    : 'Provide the assignment title and problem statement. Gemini AI will automatically construct the complete coding environment.'}
+                </p>
+              </div>
               <button
-                onClick={() => setIsCreateModalOpen(false)}
+                onClick={() => {
+                  setIsCreateModalOpen(false);
+                  setCreationStep('input');
+                }}
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateAssignment} className="space-y-3.5 text-xs">
-              <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Assignment Title</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Graph Traversal: BFS & DFS"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white"
-                />
+            {/* Error Notification */}
+            {aiAnalysisError && (
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-2xl flex items-center justify-between text-xs text-rose-700 dark:text-rose-300">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+                  <span>{aiAnalysisError}</span>
+                </div>
+                <button onClick={() => setAiAnalysisError(null)} className="font-bold text-rose-600 hover:underline">Dismiss</button>
               </div>
+            )}
 
-              <div className="grid grid-cols-2 gap-3">
+            {/* ======================================================== */}
+            {/* STEP 1: SIMPLIFIED TEACHER INPUT FORM                     */}
+            {/* ======================================================== */}
+            {creationStep === 'input' && (
+              <div className="space-y-4 text-xs">
                 <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Course Code</label>
-                  <input
-                    type="text"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Deadline Date</label>
-                  <input
-                    type="date"
-                    value={deadline}
-                    onChange={(e) => setDeadline(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Subject</label>
-                  <input
-                    type="text"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Min Passing Viva Score (%)</label>
-                  <input
-                    type="number"
-                    min="50"
-                    max="100"
-                    value={minQuiz}
-                    onChange={(e) => setMinQuiz(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Target Department</label>
-                  <input
-                    type="text"
-                    value={targetDepartment}
-                    onChange={(e) => setTargetDepartment(e.target.value)}
-                    placeholder="e.g. Computer Engineering"
-                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Target Division</label>
-                  <select
-                    value={targetDivision}
-                    onChange={(e) => setTargetDivision(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white"
-                  >
-                    <option value="all">All Divisions (A, B, C)</option>
-                    <option value="A">Division A Only</option>
-                    <option value="B">Division B Only</option>
-                    <option value="C">Division C Only</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Problem Description</label>
-                <textarea
-                  rows={3}
-                  required
-                  placeholder="Explain the problem statement..."
-                  value={desc}
-                  onChange={(e) => setDesc(e.target.value)}
-                  className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1 text-xs">Input Format (Optional)</label>
-                  <input
-                    type="text"
-                    value={inputFormat}
-                    onChange={(e) => setInputFormat(e.target.value)}
-                    placeholder="e.g. Space-separated integers on line 1"
-                    className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1 text-xs">Output Format (Optional)</label>
-                  <input
-                    type="text"
-                    value={outputFormat}
-                    onChange={(e) => setOutputFormat(e.target.value)}
-                    placeholder="e.g. A single integer or boolean string"
-                    className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1 text-xs">Constraints (Optional)</label>
-                <input
-                  type="text"
-                  value={constraints}
-                  onChange={(e) => setConstraints(e.target.value)}
-                  placeholder="e.g. 1 <= N <= 10^5, -10^9 <= val <= 10^9"
-                  className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono text-slate-900 dark:text-white"
-                />
-              </div>
-
-              {/* LeetCode Testcases Configuration & AI Generator */}
-              <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="font-bold text-slate-800 dark:text-slate-200 block text-xs flex items-center gap-1.5">
-                    <span>🧪 Assignment Test Cases ({testcases.length})</span>
-                    <span className="text-[10px] text-slate-500 font-normal">(LeetCode Style Stdin &amp; Output)</span>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                    Assignment Title <span className="text-rose-500">*</span>
                   </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Two Sum Problem or Binary Search Tree Insertion"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white font-medium"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-slate-700 dark:text-slate-300">
+                      Problem Statement <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-slate-400">Describe the problem, input requirements, and expected outputs</span>
+                  </div>
+                  <textarea
+                    rows={5}
+                    required
+                    placeholder="Describe the problem in plain English or paste from syllabus. For example: Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target..."
+                    value={desc}
+                    onChange={(e) => setDesc(e.target.value)}
+                    className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:border-indigo-600 text-slate-900 dark:text-white leading-relaxed resize-y"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Difficulty Level</label>
+                    <select
+                      value={difficulty}
+                      onChange={(e) => setDifficulty(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                    >
+                      <option value="Easy">Easy</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Hard">Hard</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Course Code</label>
+                    <input
+                      type="text"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Programming Languages Selection */}
+                <div>
+                  <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1.5">
+                    Supported Programming Languages
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: 'python', name: '🐍 Python' },
+                      { id: 'cpp', name: '⚡ C++' },
+                      { id: 'java', name: '☕ Java' },
+                      { id: 'javascript', name: '🟨 JavaScript' },
+                      { id: 'c', name: '⚙️ C' }
+                    ].map(lang => {
+                      const isChecked = selectedLanguages.includes(lang.id);
+                      return (
+                        <button
+                          type="button"
+                          key={lang.id}
+                          onClick={() => {
+                            if (isChecked) {
+                              if (selectedLanguages.length > 1) {
+                                setSelectedLanguages(selectedLanguages.filter(l => l !== lang.id));
+                              }
+                            } else {
+                              setSelectedLanguages([...selectedLanguages, lang.id]);
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 ${
+                            isChecked 
+                              ? 'bg-indigo-600 border-indigo-600 text-white shadow-xs' 
+                              : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400'
+                          }`}
+                        >
+                          {isChecked ? <Check className="w-3.5 h-3.5" /> : null}
+                          <span>{lang.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Deadline Date</label>
+                    <input
+                      type="date"
+                      value={deadline}
+                      onChange={(e) => setDeadline(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Min Passing Viva Score (%)</label>
+                    <input
+                      type="number"
+                      min="50"
+                      max="100"
+                      value={minQuiz}
+                      onChange={(e) => setMinQuiz(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Target Department</label>
+                    <input
+                      type="text"
+                      value={targetDepartment}
+                      onChange={(e) => setTargetDepartment(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Target Division</label>
+                    <select
+                      value={targetDivision}
+                      onChange={(e) => setTargetDivision(e.target.value)}
+                      className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                    >
+                      <option value="all">All Divisions (A, B, C)</option>
+                      <option value="A">Division A Only</option>
+                      <option value="B">Division B Only</option>
+                      <option value="C">Division C Only</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* AI Action Banner */}
+                <div className="pt-2">
                   <button
                     type="button"
-                    onClick={handleAiGenerateTestcases}
-                    disabled={isGeneratingAiTestcases}
-                    className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] flex items-center gap-1 shadow-xs transition"
+                    onClick={handleAiGenerateFullAssignment}
+                    disabled={isAiAnalyzing || !title.trim() || !desc.trim()}
+                    className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 hover:from-indigo-500 hover:to-purple-600 text-white font-extrabold text-sm shadow-lg shadow-indigo-500/25 transition flex items-center justify-center gap-2 disabled:opacity-50"
                   >
-                    {isGeneratingAiTestcases ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3 text-amber-300" />}
-                    <span>{isGeneratingAiTestcases ? 'Generating...' : '✨ AI Generate Testcases'}</span>
+                    {isAiAnalyzing ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin text-amber-300" />
+                        <span>AI Analyzing Problem & Independently Verifying Test Cases...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 text-amber-300" />
+                        <span>✨ AI Generate Assignment & Complete Environment</span>
+                      </>
+                    )}
+                  </button>
+                  <div className="flex justify-between items-center mt-2 px-1">
+                    <span className="text-[10px] text-slate-400">Zero manual boilerplate. AI synthesizes function config, starter code & verified tests.</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreationMode('full_program');
+                        setCreationStep('review');
+                        setReviewTab('specs');
+                      }}
+                      className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline font-semibold"
+                    >
+                      Or switch to manual Full Program Mode
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ======================================================== */}
+            {/* STEP 2: TEACHER REVIEW & APPROVAL INTERFACE              */}
+            {/* ======================================================== */}
+            {creationStep === 'review' && (
+              <div className="space-y-4 text-xs">
+                {/* Status Bar */}
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-lg bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 font-bold font-mono">
+                      {creationMode === 'function' ? '⚡ Function-Based Mode (LeetCode)' : '📄 Full Program Mode'}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold">
+                      {difficulty}
+                    </span>
+                    {verificationReport && (
+                      <span className="px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>{verificationReport.passedCount}/{verificationReport.totalCount} Testcases Verified</span>
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCreationMode(prev => prev === 'function' ? 'full_program' : 'function')}
+                    className="text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:text-indigo-600 underline"
+                  >
+                    Switch to {creationMode === 'function' ? 'Full Program Mode' : 'Function-Based Mode'}
                   </button>
                 </div>
 
-                <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
-                  {testcases.map((tc, idx) => (
-                    <div key={idx} className="p-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="font-bold text-indigo-600 dark:text-indigo-400">Case {idx + 1}</span>
-                        <button
-                          type="button"
-                          onClick={() => setTestcases(prev => prev.filter((_, i) => i !== idx))}
-                          className="text-rose-500 hover:text-rose-700 font-bold text-[10px]"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <textarea
-                          rows={2}
-                          placeholder="Input (stdin)"
-                          value={tc.input || ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setTestcases(prev => prev.map((t, i) => i === idx ? { ...t, input: val } : t));
-                          }}
-                          className="p-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-mono text-slate-900 dark:text-white resize-y"
-                        />
-                        <textarea
-                          rows={2}
-                          placeholder="Expected Output"
-                          value={tc.expectedOutput || ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setTestcases(prev => prev.map((t, i) => i === idx ? { ...t, expectedOutput: val } : t));
-                          }}
-                          className="p-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] font-mono text-slate-900 dark:text-white resize-y"
-                        />
-                      </div>
-                    </div>
+                {/* Review Tabs Navigation */}
+                <div className="flex border-b border-slate-200 dark:border-slate-800 gap-1 overflow-x-auto pb-1">
+                  {[
+                    { id: 'specs', label: '📝 Problem Specs' },
+                    { id: 'function', label: '⚙️ Function Config' },
+                    { id: 'templates', label: '💻 Starter Code' },
+                    { id: 'testcases', label: `🧪 Test Cases (${testcases.length + hiddenCases.length})` },
+                    { id: 'quiz', label: `❓ Viva Quiz (${quizQuestions.length})` }
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setReviewTab(tab.id)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                        reviewTab === tab.id
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
                   ))}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setTestcases(prev => [...prev, { input: '', expectedOutput: '', explanation: '' }])}
-                  className="w-full py-1 text-center text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
-                >
-                  + Add Custom Testcase
-                </button>
-              </div>
+                {/* TAB 1: PROBLEM SPECS */}
+                {reviewTab === 'specs' && (
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Problem Title</label>
+                      <input
+                        type="text"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Problem Statement</label>
+                      <textarea
+                        rows={4}
+                        value={desc}
+                        onChange={(e) => setDesc(e.target.value)}
+                        className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-sans"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Input Requirements</label>
+                        <input
+                          type="text"
+                          value={inputFormat}
+                          onChange={(e) => setInputFormat(e.target.value)}
+                          className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Expected Output Format</label>
+                        <input
+                          type="text"
+                          value={outputFormat}
+                          onChange={(e) => setOutputFormat(e.target.value)}
+                          className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Constraints</label>
+                      <input
+                        type="text"
+                        value={constraints}
+                        onChange={(e) => setConstraints(e.target.value)}
+                        className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
 
-              <div className="flex justify-end space-x-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmittingAsg}
-                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition shadow-xs flex items-center gap-1.5"
-                >
-                  {isSubmittingAsg && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                  <span>Publish Assignment</span>
-                </button>
+                {/* TAB 2: FUNCTION CONFIG */}
+                {reviewTab === 'function' && (
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Function Name</label>
+                        <input
+                          type="text"
+                          value={functionConfig.functionName}
+                          onChange={(e) => setFunctionConfig({ ...functionConfig, functionName: e.target.value })}
+                          className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-slate-900 dark:text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Class Name</label>
+                        <input
+                          type="text"
+                          value={functionConfig.className || 'Solution'}
+                          onChange={(e) => setFunctionConfig({ ...functionConfig, className: e.target.value })}
+                          className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-slate-900 dark:text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Return Type</label>
+                        <input
+                          type="text"
+                          value={functionConfig.returnType || 'void'}
+                          onChange={(e) => setFunctionConfig({ ...functionConfig, returnType: e.target.value })}
+                          className="w-full p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-slate-900 dark:text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="font-bold text-slate-700 dark:text-slate-300 block">Function Parameters</label>
+                        <button
+                          type="button"
+                          onClick={() => setFunctionConfig({
+                            ...functionConfig,
+                            parameters: [...(functionConfig.parameters || []), { name: `arg${(functionConfig.parameters || []).length + 1}`, type: 'int', description: '' }]
+                          })}
+                          className="text-[11px] font-bold text-indigo-600 hover:underline"
+                        >
+                          + Add Parameter
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        {(functionConfig.parameters || []).map((p, idx) => (
+                          <div key={idx} className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 grid grid-cols-12 gap-2 items-center">
+                            <div className="col-span-4">
+                              <input
+                                type="text"
+                                placeholder="Param Name"
+                                value={p.name}
+                                onChange={(e) => {
+                                  const updated = [...functionConfig.parameters];
+                                  updated[idx].name = e.target.value;
+                                  setFunctionConfig({ ...functionConfig, parameters: updated });
+                                }}
+                                className="w-full p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-900 dark:text-white"
+                              />
+                            </div>
+                            <div className="col-span-4">
+                              <input
+                                type="text"
+                                placeholder="Type (e.g. int, int[], string)"
+                                value={p.type}
+                                onChange={(e) => {
+                                  const updated = [...functionConfig.parameters];
+                                  updated[idx].type = e.target.value;
+                                  setFunctionConfig({ ...functionConfig, parameters: updated });
+                                }}
+                                className="w-full p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg font-mono text-xs text-slate-900 dark:text-white"
+                              />
+                            </div>
+                            <div className="col-span-3">
+                              <input
+                                type="text"
+                                placeholder="Description"
+                                value={p.description || ''}
+                                onChange={(e) => {
+                                  const updated = [...functionConfig.parameters];
+                                  updated[idx].description = e.target.value;
+                                  setFunctionConfig({ ...functionConfig, parameters: updated });
+                                }}
+                                className="w-full p-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-white"
+                              />
+                            </div>
+                            <div className="col-span-1 text-right">
+                              <button
+                                type="button"
+                                onClick={() => setFunctionConfig({
+                                  ...functionConfig,
+                                  parameters: functionConfig.parameters.filter((_, i) => i !== idx)
+                                })}
+                                className="text-rose-500 hover:text-rose-700 font-bold"
+                              >
+                                <X className="w-4 h-4 inline" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 3: STARTER CODE TEMPLATES */}
+                {reviewTab === 'templates' && (
+                  <div className="space-y-3">
+                    <div className="flex gap-1 border-b border-slate-200 dark:border-slate-700 pb-1">
+                      {selectedLanguages.map(l => (
+                        <button
+                          key={l}
+                          type="button"
+                          onClick={() => setPreviewLanguage(l)}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold transition uppercase ${
+                            previewLanguage === l ? 'bg-indigo-600 text-white' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="font-bold text-slate-700 dark:text-slate-300">
+                          {previewLanguage.toUpperCase()} Starter Code (Students will complete this)
+                        </label>
+                        <span className="text-[10px] text-slate-400">Driver wrapper will be injected automatically</span>
+                      </div>
+                      <textarea
+                        rows={10}
+                        value={starterTemplates[previewLanguage] || ''}
+                        onChange={(e) => setStarterTemplates({
+                          ...starterTemplates,
+                          [previewLanguage]: e.target.value
+                        })}
+                        className="w-full p-3 bg-slate-900 text-emerald-400 font-mono text-xs rounded-xl resize-y border border-slate-700 leading-relaxed"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 4: TEST CASES (PUBLIC & HIDDEN) */}
+                {reviewTab === 'testcases' && (
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">
+                          All Configured Test Cases ({testcases.length} Public, {hiddenCases.length} Hidden)
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleReVerifyTestcases}
+                          disabled={isReVerifying}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-600 dark:text-emerald-400 font-bold text-[11px] border border-emerald-500/30 flex items-center gap-1 hover:bg-emerald-600/30 transition disabled:opacity-50"
+                        >
+                          {isReVerifying ? <RefreshCw className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
+                          <span>{isReVerifying ? 'Verifying...' : '🔄 Re-Verify with Reference Solution'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTestcases(prev => [...prev, { input: '', expectedOutput: '', category: 'basic', verified: false }])}
+                          className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-bold text-[11px] hover:bg-indigo-700 transition"
+                        >
+                          + Add Public Case
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setHiddenCases(prev => [...prev, { input: '', expectedOutput: '', category: 'hidden', verified: false }])}
+                          className="px-2.5 py-1 rounded-lg bg-slate-800 text-white font-bold text-[11px] hover:bg-slate-700 transition"
+                        >
+                          + Add Hidden Case
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Public Testcases Section */}
+                    <div className="space-y-2">
+                      <div className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider flex items-center gap-1">
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Public Sample Test Cases (Visible to Students)</span>
+                      </div>
+                      {testcases.map((tc, idx) => (
+                        <div key={idx} className="p-3 bg-white dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-1.5 shadow-xs">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <div className="flex items-center gap-2">
+                              <span className="font-extrabold text-indigo-600 dark:text-indigo-400">Case #{idx + 1}</span>
+                              <span className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-mono text-[10px]">
+                                {tc.category || 'public'}
+                              </span>
+                              {tc.verified && (
+                                <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>Verified ✅</span>
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  // Move to hidden
+                                  setTestcases(prev => prev.filter((_, i) => i !== idx));
+                                  setHiddenCases(prev => [...prev, { ...tc, category: 'hidden' }]);
+                                }}
+                                className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-semibold text-[10px]"
+                              >
+                                Move to Hidden
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setTestcases(prev => prev.filter((_, i) => i !== idx))}
+                                className="text-rose-500 hover:text-rose-700 font-bold text-[10px]"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Input Parameters (stdin/args)</label>
+                              <textarea
+                                rows={2}
+                                value={tc.input || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setTestcases(prev => prev.map((t, i) => i === idx ? { ...t, input: val } : t));
+                                }}
+                                className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-[11px] text-slate-900 dark:text-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Expected Output (return value)</label>
+                              <textarea
+                                rows={2}
+                                value={tc.expectedOutput || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setTestcases(prev => prev.map((t, i) => i === idx ? { ...t, expectedOutput: val } : t));
+                                }}
+                                className="w-full p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-[11px] text-slate-900 dark:text-white"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Hidden Testcases Section */}
+                    <div className="space-y-2 pt-2">
+                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1">
+                        <Lock className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Hidden Test Cases (Used for Verification & Submission)</span>
+                      </div>
+                      {hiddenCases.map((tc, idx) => (
+                        <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <div className="flex items-center gap-2">
+                              <span className="font-extrabold text-amber-600 dark:text-amber-400">Hidden #{idx + 1}</span>
+                              <span className="px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 font-mono text-[10px]">
+                                {tc.category || 'hidden'}
+                              </span>
+                              {tc.verified && (
+                                <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  <span>Verified ✅</span>
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  // Move to public
+                                  setHiddenCases(prev => prev.filter((_, i) => i !== idx));
+                                  setTestcases(prev => [...prev, { ...tc, category: 'normal' }]);
+                                }}
+                                className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-semibold text-[10px]"
+                              >
+                                Move to Public
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setHiddenCases(prev => prev.filter((_, i) => i !== idx))}
+                                className="text-rose-500 hover:text-rose-700 font-bold text-[10px]"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <textarea
+                                rows={2}
+                                placeholder="Input"
+                                value={tc.input || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setHiddenCases(prev => prev.map((t, i) => i === idx ? { ...t, input: val } : t));
+                                }}
+                                className="w-full p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-[11px] text-slate-900 dark:text-white"
+                              />
+                            </div>
+                            <div>
+                              <textarea
+                                rows={2}
+                                placeholder="Expected Output"
+                                value={tc.expectedOutput || ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setHiddenCases(prev => prev.map((t, i) => i === idx ? { ...t, expectedOutput: val } : t));
+                                }}
+                                className="w-full p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-[11px] text-slate-900 dark:text-white"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 5: QUIZ QUESTIONS */}
+                {reviewTab === 'quiz' && (
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">
+                        Assignment-Tailored Viva Questions ({quizQuestions.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setQuizQuestions(prev => [
+                          ...prev,
+                          {
+                            question: 'What is the time complexity of the optimal solution for this problem?',
+                            options: ['O(N)', 'O(N^2)', 'O(log N)', 'O(1)'],
+                            correctAnswer: 0,
+                            explanation: 'Optimal solution traverses the collection in linear time.',
+                            difficulty: 'Medium'
+                          }
+                        ])}
+                        className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-bold text-[11px] hover:bg-indigo-700 transition"
+                      >
+                        + Add Question
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {quizQuestions.map((q, qIdx) => (
+                        <div key={qIdx} className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-extrabold text-indigo-600 dark:text-indigo-400 text-xs">Question {qIdx + 1}</span>
+                            <button
+                              type="button"
+                              onClick={() => setQuizQuestions(prev => prev.filter((_, i) => i !== qIdx))}
+                              className="text-rose-500 hover:text-rose-700 font-bold text-[10px]"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                          <input
+                            type="text"
+                            value={q.question || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setQuizQuestions(prev => prev.map((item, i) => i === qIdx ? { ...item, question: val } : item));
+                            }}
+                            className="w-full p-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-white"
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            {(q.options || []).map((opt, oIdx) => {
+                              const isCorrect = q.correctAnswer === oIdx;
+                              return (
+                                <div key={oIdx} className="flex items-center gap-1.5 p-1.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
+                                  <input
+                                    type="radio"
+                                    name={`correct_${qIdx}`}
+                                    checked={isCorrect}
+                                    onChange={() => {
+                                      setQuizQuestions(prev => prev.map((item, i) => i === qIdx ? { ...item, correctAnswer: oIdx } : item));
+                                    }}
+                                    className="cursor-pointer text-emerald-600"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={opt}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setQuizQuestions(prev => prev.map((item, i) => {
+                                        if (i !== qIdx) return item;
+                                        const newOpts = [...item.options];
+                                        newOpts[oIdx] = val;
+                                        return { ...item, options: newOpts };
+                                      }));
+                                    }}
+                                    className={`w-full bg-transparent text-xs text-slate-900 dark:text-white focus:outline-none ${isCorrect ? 'font-bold text-emerald-600 dark:text-emerald-400' : ''}`}
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {q.explanation && (
+                            <p className="text-[10px] text-slate-500 italic">Explanation: {q.explanation}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Modal Review Actions */}
+                <div className="flex flex-wrap items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-3 gap-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCreationStep('input')}
+                      className="px-3.5 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 font-bold"
+                    >
+                      ← Back to Edit Inputs
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAiGenerateFullAssignment}
+                      disabled={isAiAnalyzing}
+                      className="px-3 py-2 rounded-xl text-indigo-600 dark:text-indigo-400 hover:underline font-bold text-xs flex items-center gap-1"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isAiAnalyzing ? 'animate-spin' : ''}`} />
+                      <span>Regenerate with AI</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCreateModalOpen(false);
+                        setCreationStep('input');
+                      }}
+                      className="px-4 py-2 rounded-xl text-slate-600 dark:text-slate-400 hover:text-slate-900 font-semibold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCreateAssignment}
+                      disabled={isSubmittingAsg}
+                      className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold shadow-md shadow-emerald-600/20 transition flex items-center gap-2"
+                    >
+                      {isSubmittingAsg ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                      <span>🚀 Approve & Publish Assignment</span>
+                    </button>
+                  </div>
+                </div>
               </div>
-            </form>
+            )}
+
           </div>
         </div>
       )}
