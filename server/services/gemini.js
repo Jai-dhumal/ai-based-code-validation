@@ -1,10 +1,11 @@
 // Gemini AI Service for Tier-2 Deep Semantic Analysis and Code-Tailored Dynamic Quiz Generation
 
 const GEMINI_MODELS = [
+  'gemini-3.5-flash',
+  'gemini-3.8-flash',
   'gemini-flash-latest',
   'gemini-2.5-flash-lite',
-  'gemini-pro-latest',
-  'gemini-1.5-flash'
+  'gemini-pro-latest'
 ];
 
 async function queryGeminiWithFallback(apiKey, payload) {

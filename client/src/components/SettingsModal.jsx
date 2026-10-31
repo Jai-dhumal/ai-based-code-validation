@@ -75,7 +75,7 @@ export default function SettingsModal({ isOpen, onClose, currentSettings, onSave
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder="AIzaSy... (leave blank to keep current or use offline simulator)"
+              placeholder="Enter Gemini API key (leave blank to keep current or use offline simulator)"
               className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-slate-800 dark:text-slate-200 text-xs focus:outline-none transition"
             />
             <p className="text-[11px] text-slate-500 dark:text-slate-400">

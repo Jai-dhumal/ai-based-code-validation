@@ -238,7 +238,20 @@
       "starterCode": {
         "python": "class TreeNode:\n    def __init__(self, val=0):\n        self.val = val\n        self.left = None\n        self.right = None\n\nclass BinarySearchTree:\n    def __init__(self):\n        self.root = None\n\n    def insert(self, val):\n        # TODO: Implement insert\n        pass\n\n    def search(self, val):\n        # TODO: Implement search\n        return False\n\n    def in_order(self):\n        # TODO: Return list of values\n        return []\n",
         "cpp": "#include <iostream>\n#include <vector>\n\nstruct TreeNode {\n    int val;\n    TreeNode* left;\n    TreeNode* right;\n    TreeNode(int v) : val(v), left(nullptr), right(nullptr) {}\n};\n\nclass BinarySearchTree {\npublic:\n    TreeNode* root = nullptr;\n    void insert(int val);\n    bool search(int val);\n    std::vector<int> inOrder();\n};\n"
-      }
+      },
+      "examples": [],
+      "testcases": [],
+      "problemStatement": "Implement a Binary Search Tree (BST) supporting insert(val), search(val), and in_order_traversal(). Optimize for clean recursion and edge handling (empty tree, duplicates).",
+      "inputFormat": "",
+      "outputFormat": "",
+      "constraints": "",
+      "department": "Computer Engineering",
+      "division": "all",
+      "divisions": [
+        "A",
+        "B",
+        "C"
+      ]
     },
     {
       "id": "asg_2",
@@ -255,6 +268,64 @@
       "description": "Implement Dijkstra's Single Source Shortest Path on a weighted directed graph using a Min-Heap / Priority Queue. Handle disconnected graphs gracefully.",
       "starterCode": {
         "python": "import heapq\n\ndef dijkstra(graph, start_node):\n    # graph is {u: [(v, weight), ...]}\n    # TODO: return shortest distances dict from start_node\n    distances = {start_node: 0}\n    return distances\n"
+      },
+      "examples": [],
+      "testcases": [],
+      "problemStatement": "Implement Dijkstra's Single Source Shortest Path on a weighted directed graph using a Min-Heap / Priority Queue. Handle disconnected graphs gracefully.",
+      "inputFormat": "",
+      "outputFormat": "",
+      "constraints": "",
+      "department": "Computer Engineering",
+      "division": "all",
+      "divisions": [
+        "A",
+        "B",
+        "C"
+      ]
+    },
+    {
+      "id": "asg_3",
+      "title": "Find Greatest of Two Numbers",
+      "subject": "Programming Fundamentals",
+      "code": "CS302",
+      "deadline": "2026-11-15",
+      "languages": [
+        "cpp",
+        "java",
+        "python",
+        "c"
+      ],
+      "department": "Computer Engineering",
+      "division": "all",
+      "divisions": [
+        "A",
+        "B",
+        "C"
+      ],
+      "minQuizScore": 70,
+      "teacherId": "usr_teacher_1",
+      "description": "Write a program to accept two integers from standard input and output the greatest of the two numbers.",
+      "problemStatement": "Write a program that takes two integers separated by whitespace or newline as input and prints the greater of the two numbers to standard output.",
+      "inputFormat": "Two space or newline separated integers, A and B.",
+      "outputFormat": "A single integer representing the maximum of A and B.",
+      "constraints": "-10^9 <= A, B <= 10^9",
+      "examples": [
+        {
+          "input": "10 20",
+          "expectedOutput": "20",
+          "explanation": "Between 10 and 20, 20 is the greatest."
+        }
+      ],
+      "testcases": [
+        {
+          "input": "10 20",
+          "expectedOutput": "20",
+          "explanation": "Between 10 and 20, 20 is the greatest."
+        }
+      ],
+      "starterCode": {
+        "python": "# Read two numbers and print the greatest\nimport sys\n\ndef main():\n    nums = sys.stdin.read().split()\n    if len(nums) >= 2:\n        a, b = int(nums[0]), int(nums[1])\n        print(max(a, b))\n\nif __name__ == \"__main__\":\n    main()\n",
+        "cpp": "#include <iostream>\nusing namespace std;\n\nint main() {\n    long long a, b;\n    if (cin >> a >> b) {\n        cout << (a > b ? a : b) << endl;\n    }\n    return 0;\n}\n"
       }
     }
   ],
